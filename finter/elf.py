@@ -284,19 +284,19 @@ def isElf(fp):
     tmp = fp.tell()
     fp.seek(0)
     if fp.read(4) != b"\x7fELF": 
-        print("NO SIGNATURE")
+        #print("NO SIGNATURE")
         return False
     elfClass = unpack('B', fp.read(1))[0] # e_ident[EI_CLASS]
     if not (elfClass in [ELFCLASS32, ELFCLASS64]):
-        print("NO elfClass")
+        #print("NO elfClass")
         return False
     eiData = unpack('B', fp.read(1))[0] # e_ident[EI_DATA]
     if not eiData in [ELFDATA2LSB, ELFDATA2MSB]:
-        print("NO eiData")
+        #print("NO eiData")
         return False
     eiVersion = unpack('B', fp.read(1))[0]
     if not (eiVersion in [EV_CURRENT]): # e_ident[EI_VERSION]
-        print("NO eiVersion")
+        #print("NO eiVersion")
         return False 
     fp.seek(tmp)
     return (True, elfClass)

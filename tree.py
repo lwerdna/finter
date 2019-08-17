@@ -5,6 +5,7 @@ import io
 import sys
 from finter import elf32, elf64
 from intervaltree import Interval, IntervalTree
+from helpers import dissect_file
 
 def print_recur(tree, a, depth=0):
     indent = depth*'  '
@@ -18,21 +19,10 @@ def print_recur(tree, a, depth=0):
         print_recur(tree, child, depth+1)
 
 if __name__ == '__main__':
-    buf = io.StringIO()
-    old_stdout = sys.stdout
-    sys.stdout = buf
-
-    with open(sys.argv[1], 'rb') as fp:
-        if not buf.getvalue():
-            elf64.analyze(fp)
-        if not buf.getvalue():
-            elf32.analyze(fp)
-        if not buf.getvalue():
-            raise Exception('no file modules answered the call')
-
-    interval_lines = buf.getvalue()
-    buf.close()
-    sys.stdout = old_stdout
+    interval_lines = dissect_file(sys.argv[1])
+    if not interval_lines:
+        print('no file dissectors answered the call')
+        sys.exit(-1)
 
     intervals = []
     for (i,line) in enumerate(interval_lines.split('\n')):

@@ -90,7 +90,7 @@ def colorFromBytesFP(FP, length, rewind=0):
 def IsEof(FP):
     answer = False
     temp = FP.tell()
-    if FP.read()=='':
+    if FP.read() == b'':
         answer = True
     FP.seek(temp)
     return answer
