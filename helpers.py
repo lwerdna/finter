@@ -22,17 +22,19 @@ def dissect_file(fpath):
     """ identify file path, call dissector """
 
     sig2dissector = [
-        ('GPG symmetrically encrypted data', gpg.analyze),
-        ('ELF 32-bit LSB executable', elf32.analyze),
-        ('ELF 32-bit MSB executable', elf32.analyze),
-        ('ELF 64-bit LSB executable', elf64.analyze),
-        ('ELF 64-bit MSB executable', elf64.analyze),
+        (r'GPG symmetrically encrypted data', gpg.analyze),
+        (r'ELF 32-bit LSB executable', elf32.analyze),
+        (r'ELF 32-bit MSB executable', elf32.analyze),
+        (r'ELF 64-bit LSB executable', elf64.analyze),
+        (r'ELF 64-bit MSB executable', elf64.analyze),
+        (r'PE32 executable .* 80386', pe32.analyze),
+        (r'PE32\+ executable .* x86-64', pe64.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
     analyze = None
     for (sig, dissector) in sig2dissector:
-        if sig in file_str:
+        if re.search(sig, file_str):
             #print('matched on %s' % sig)
             analyze = dissector
             break
