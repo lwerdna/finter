@@ -223,7 +223,7 @@ def string(FP, length, peek=0):
 
 #
 def dataUntil(FP, terminator, peek=0):
-    data = ''
+    data = b''
     lenterm = len(terminator)
     while 1:
         data += FP.read(1)

@@ -18,9 +18,8 @@ def shellout(cmd):
     process.wait()
     return (stdout, stderr)
 
-def dissect_file(fpath):
-    """ identify file path, call dissector """
-
+def find_dissector(fpath):
+    """ given a file path, return a dissector function """
     sig2dissector = [
         (r'GPG symmetrically encrypted data', gpg.analyze),
         (r'ELF 32-bit LSB executable', elf32.analyze),
@@ -28,7 +27,8 @@ def dissect_file(fpath):
         (r'ELF 64-bit LSB executable', elf64.analyze),
         (r'ELF 64-bit MSB executable', elf64.analyze),
         (r'PE32 executable .* 80386', pe32.analyze),
-        (r'PE32\+ executable .* x86-64', pe64.analyze)
+        (r'PE32\+ executable .* x86-64', pe64.analyze),
+        (r'Dalvik dex file', dex.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
@@ -39,6 +39,12 @@ def dissect_file(fpath):
             analyze = dissector
             break
 
+    return analyze
+
+def dissect_file(fpath):
+    """ identify file path, call dissector """
+
+    analyze = find_dissector(fpath)
     if not analyze:
         return
 

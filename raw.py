@@ -4,6 +4,11 @@ import sys
 import helpers
 
 if __name__ == '__main__':
-    for (i,line) in enumerate(helpers.dissect_file(sys.argv[1])):
-        print('%d: %s' % (i, line))
+    fpath = sys.argv[1]
+    analyze = helpers.find_dissector(fpath)
+    if not analyze:
+        raise Exception('no dissector find')
+
+    with open(fpath, 'rb') as fp:
+        analyze(fp)
 
