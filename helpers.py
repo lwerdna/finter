@@ -3,34 +3,53 @@
 import io
 import re
 import sys
+from subprocess import Popen, PIPE
 
 from finter import *
 from intervaltree import Interval, IntervalTree
 
-dissectors = [
-    elf32.analyze,
-    elf64.analyze,
-    gpg.analyze
-]
+def shellout(cmd):
+    process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    (stdout, stderr) = process.communicate()
+    stdout = stdout.decode("utf-8")
+    stderr = stderr.decode("utf-8")
+    #print('stdout: -%s-' % stdout)
+    #print('stderr: -%s-' % stderr)
+    process.wait()
+    return (stdout, stderr)
 
 def dissect_file(fpath):
-    """ try all dissectors on given file path """
+    """ identify file path, call dissector """
+
+    sig2dissector = [
+        ('GPG symmetrically encrypted data', gpg.analyze),
+        ('ELF 32-bit LSB executable', elf32.analyze),
+        ('ELF 32-bit MSB executable', elf32.analyze),
+        ('ELF 64-bit LSB executable', elf64.analyze),
+        ('ELF 64-bit MSB executable', elf64.analyze),
+    ]
+
+    (file_str, _) = shellout(['file', fpath])
+    analyze = None
+    for (sig, dissector) in sig2dissector:
+        if sig in file_str:
+            #print('matched on %s' % sig)
+            analyze = dissector
+            break
+
+    if not analyze:
+        return
 
     # capture stdout to StringIO
     buf = io.StringIO()
     old_stdout = sys.stdout
     sys.stdout = buf
 
-    # call all analyzers
+    # call analyzer 
     interval_lines = ''
     with open(fpath, 'rb') as fp:
-        for analyze in dissectors:
-            #sys.stderr.write('trying: %s\n' % analyze)
-            fp.seek(0, 0)
-            analyze(fp)
-            interval_lines = buf.getvalue()
-            if interval_lines:
-                break
+        analyze(fp)
+        interval_lines = buf.getvalue()
 
     # cleanup, return
     buf.close()
@@ -61,7 +80,7 @@ def intervals_from_text(lines):
         if not line:
             continue
 
-        m = re.match(r'\[(.*),(.*)\) (.*)', line)
+        m = re.match(r'\[(.*?),(.*?)\) (.*)', line)
         if not m:
             raise Exception('MALFORMED: %s' % line)
 
@@ -71,7 +90,7 @@ def intervals_from_text(lines):
 
     return intervals
 
-def interval_tree_to_hierarchy(tree):
+def interval_tree_to_hierarchy(tree, nodeType=hnode):
     """ convert IntervalTree to a hierarchy using hnode """
 
     # initialize interval -> node mapping
@@ -91,15 +110,15 @@ def interval_tree_to_hierarchy(tree):
                 child2parent[c] = min(child2parent[c], parent, key=lambda x: x.length())
 
     # wrap the child2parent relationships into hnode
-    hnRoot = hnode(Interval(tree.begin(), tree.end(), "root"))
-    inter2hnode = { x:hnode(x) for x in tree }
+    hnRoot = nodeType(Interval(tree.begin(), tree.end(), "root"))
+    inter2node = { x:nodeType(x) for x in tree }
 
     for (child, parent) in child2parent.items():
-        hnChild = inter2hnode[child]
+        hnChild = inter2node[child]
         if not parent:
             hnRoot.children.append(hnChild)
         else:
-            hnParent = inter2hnode[parent]
+            hnParent = inter2node[parent]
             hnParent.children.append(hnChild)
 
     # done

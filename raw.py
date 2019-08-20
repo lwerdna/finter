@@ -4,8 +4,6 @@ import sys
 import helpers
 
 if __name__ == '__main__':
-    with open(sys.argv[1], 'rb') as fp:
-        for analyze in helpers.dissectors:
-            fp.seek(0, 0)
-            analyze(fp)
+    for (i,line) in enumerate(helpers.dissect_file(sys.argv[1])):
+        print('%d: %s' % (i, line))
 
