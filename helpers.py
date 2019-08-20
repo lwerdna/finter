@@ -28,7 +28,9 @@ def find_dissector(fpath):
         (r'ELF 64-bit MSB executable', elf64.analyze),
         (r'PE32 executable .* 80386', pe32.analyze),
         (r'PE32\+ executable .* x86-64', pe64.analyze),
-        (r'Dalvik dex file', dex.analyze)
+        (r'Dalvik dex file', dex.analyze),
+        (r'MS-DOS executable', exe.analyze),
+        (r'Mach-O ', macho.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
