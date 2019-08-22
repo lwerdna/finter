@@ -43,10 +43,12 @@ def analyze(fp):
     e_shstrndx = tagUint16(fp, "e_shstrndx")
 
     # read the string table
-    fp.seek(e_shoff + e_shstrndx*SIZE_ELF32_SHDR)
-    tmp = fp.tell()
+    tmp = e_shoff + e_shstrndx*SIZE_ELF32_SHDR
+    #print('seeking to %X for the string table section header' % tmp)
+    fp.seek(tmp)
     fmt = {ELFDATA2LSB:'<IIIIII', ELFDATA2MSB:'>IIIIII'}[ei_data]
     (a,b,c,d,sh_offset,sh_size) = struct.unpack(fmt, fp.read(24))
+    #print('sh_offset: %08X, sh_size: %08X' % (sh_offset, sh_size))
     fp.seek(sh_offset)
     scnStrTab = StringTable(fp, sh_size)
 
@@ -86,14 +88,15 @@ def analyze(fp):
         if strName == '.rel.text':
             relText = [sh_offset, sh_size]
 
-        print('[0x%X,0x%X) elf32_shdr "%s" %s' % \
-            (oHdr, fp.tell(), scnStrTab[sh_name], strType))
+        print('[0x%X,0x%X) elf32_shdr "%s" %s (index: %d)' % \
+            (oHdr, fp.tell(), scnStrTab[sh_name], strType, i))
 
         if not sh_type in [SHT_NULL, SHT_NOBITS] and sh_size > 0:
             print('[0x%X,0x%X) section "%s" contents' % \
                 (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
 
     # certain sections we analyze deeper...
+    strTab = None
     if strtab:
         [offs,size] = strtab
         fp.seek(offs)
@@ -125,7 +128,7 @@ def analyze(fp):
             if d_tag == DT_NULL:
                 break
 
-    if symtab:
+    if symtab and strTab:
         # .symbtab is an array of Elf32_Sym entries
         [offs,size] = symtab
         fp.seek(offs)

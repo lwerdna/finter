@@ -262,14 +262,18 @@ class StringTable:
     def __init__(self, FP, size):
         self.offset = FP.tell()
         self.size = size
-        data = FP.read(size)
-        self.table = data.decode('utf-8')
+        self.table = FP.read(size)
 
     def __getitem__(self, offset):
+        result = None
         end = offset
-        while self.table[end] != '\0':
+        while end < len(self.table) and self.table[end] != 0:
             end += 1
-        return self.table[offset:end]
+        if end >= len(self.table):
+            result = b''
+        else:
+            result = self.table[offset:end]
+        return result.decode('utf-8')
 
     def replace_string(self, oldstr, newstr):
         offset = 0
