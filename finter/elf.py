@@ -25,6 +25,19 @@ def ei_data_tostr(t):
     else:
         return 'UNKNOWN'
 
+ET_NONE = 0
+ET_REL = 1
+ET_EXEC = 2
+ET_DYN = 3
+ET_CORE = 4
+ET_LOCPROC = 0xFF00
+ET_HIPROC = 0xFFFF
+def e_type_tostr(t):
+    lookup = ['ET_NONE', 'ET_REL', 'ET_EXEC', 'ET_DYN', 'ET_CORE']
+    if t >= 0 and t < len(lookup):
+        return lookup[t]
+    return 'UNKNOWN'
+
 EV_NONE = 0
 EV_CURRENT = 1
 EV_NUM = 2

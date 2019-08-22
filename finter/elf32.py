@@ -12,20 +12,21 @@ def analyze(fp):
            return
 
     tag(fp, SIZE_ELF32_HDR, "elf32_hdr", 1)
-    tmp = tag(fp, 4, "e_ident[0..4)")
-    tmp = tagUint8(fp, "e_ident[EI_CLASS] (32-bit)")
-    ei_data = uint8(fp, 1);
+    tag(fp, 4, "e_ident[0..4)")
+    tagUint8(fp, "e_ident[EI_CLASS] (32-bit)")
+    ei_data = uint8(fp, 1)
     tagUint8(fp, "e_ident[EI_DATA] %s" % ei_data_tostr(ei_data))
     assert(ei_data in [ELFDATA2LSB,ELFDATA2MSB])
     if ei_data == ELFDATA2LSB:
         setLittleEndian()
     elif ei_data == ELFDATA2MSB:
         setBigEndian()
-    tmp = tagUint8(fp, "e_ident[EI_VERSION]")
-    tmp = tagUint8(fp, "e_ident[EI_OSABI]");
-    tmp = tagUint8(fp, "e_ident[EI_ABIVERSION]");
-    tmp = tag(fp, 7, "e_ident[EI_PAD]");
-    tagUint16(fp, "e_type")
+    tagUint8(fp, "e_ident[EI_VERSION]")
+    tagUint8(fp, "e_ident[EI_OSABI]")
+    tagUint8(fp, "e_ident[EI_ABIVERSION]")
+    tag(fp, 7, "e_ident[EI_PAD]")
+    e_type = uint16(fp, 1)
+    tagUint16(fp, "e_type %s" % e_type_tostr(e_type))
     tagUint16(fp, "e_machine")
     tagUint32(fp, "e_version")
     tagUint32(fp, "e_entry")
@@ -45,7 +46,7 @@ def analyze(fp):
     fp.seek(e_shoff + e_shstrndx*SIZE_ELF32_SHDR)
     tmp = fp.tell()
     fmt = {ELFDATA2LSB:'<IIIIII', ELFDATA2MSB:'>IIIIII'}[ei_data]
-    (a,b,c,d,sh_offset,sh_size) = struct.unpack(fmt, fp.read(24));
+    (a,b,c,d,sh_offset,sh_size) = struct.unpack(fmt, fp.read(24))
     fp.seek(sh_offset)
     scnStrTab = StringTable(fp, sh_size)
 
@@ -104,8 +105,8 @@ def analyze(fp):
         remainder = size
         while remainder:
             tag(fp, 8, "Elf32_Rel", True)
-            tagUint32(fp, "d_val");
-            tagUint32(fp, "d_ptr");
+            tagUint32(fp, "d_val")
+            tagUint32(fp, "d_ptr")
             remainder -= 8
 
     if dynamic:
