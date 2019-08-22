@@ -28,7 +28,7 @@ class ohaNode():
             child.setfp(fp)
 
     def __str__(self, depth=0):
-        indent = '  '*depth
+        indent = '.'*depth
 
         if self.children:
             result = (75)*' ' + indent + CYAN + str(self.interval.data) + NORMAL + '\n'
@@ -89,6 +89,11 @@ if __name__ == '__main__':
 #    print(oha_comment(b'\x00\x00\x00\x00', 0x180CBC, 'sh_flags=0'))
 #    print('--')
 #    print(oha_comment(b'\x00\x00\x00\x00', 0x180CC0, 'sh_addr=0'))
+
+    if not sys.argv[1:]:
+        print('ERROR: missing file parameter')
+        print('usage: %s <file>' % sys.argv[0])
+        sys.exit(-1)
 
     lines = dissect_file(sys.argv[1])
     if not lines:

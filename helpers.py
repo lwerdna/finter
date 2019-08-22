@@ -20,6 +20,8 @@ def shellout(cmd):
 
 def find_dissector(fpath):
     """ given a file path, return a dissector function """
+
+    # first try if file will help us
     sig2dissector = [
         (r'GPG symmetrically encrypted data', gpg.analyze),
         (r'ELF 32-bit LSB executable', elf32.analyze),
@@ -40,6 +42,12 @@ def find_dissector(fpath):
             #print('matched on %s' % sig)
             analyze = dissector
             break
+
+    if not analyze:
+        if fpath.endswith('.rel'):
+            with open(fpath, 'rb') as fp:
+                if re.match(r'[XDQ][HL][234]\x0a', fp.read(4).decode('utf-8')):
+                    analyze = rel.analyze
 
     return analyze
 
