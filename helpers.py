@@ -46,6 +46,8 @@ def find_dissector(fpath):
             with open(fpath, 'rb') as fp:
                 if re.match(r'[XDQ][HL][234]\x0a', fp.read(4).decode('utf-8')):
                     analyze = rel.analyze
+        elif fpath.endswith('.ihx'):
+        	analyze = ihx.analyze
 
     return analyze
 
