@@ -14,7 +14,6 @@ from .helpers import *
 def analyze(fp):
     if not isElf64(fp):
    		return
-
     tag(fp, SIZE_ELF64_HDR, "elf64_hdr", 1)
     tag(fp, 4, "e_ident[0..4)")
     tagUint8(fp, "e_ident[EI_CLASS] (64-bit)")
@@ -25,13 +24,13 @@ def analyze(fp):
         setLittleEndian()
     elif ei_data == ELFDATA2MSB:
         setBigEndian()
-    tagUint8(fp, "e_ident[EI_VERSION] (little-end)")
+    tagUint8(fp, "e_ident[EI_VERSION] (%s-end)" % ('little' if ei_data==ELFDATA2LSB else 'big'))
     tagUint8(fp, "e_ident[EI_OSABI]")
     tagUint8(fp, "e_ident[EI_ABIVERSION]")
     tag(fp, 7, "e_ident[EI_PAD]")
+    assert fp.tell() == 16
     e_type = uint16(fp, 1)
     tagUint16(fp, "e_type %s" % e_type_tostr(e_type))    
-    tagUint16(fp, "e_type")
     tagUint16(fp, "e_machine")
     tagUint32(fp, "e_version")
     tagUint64(fp, "e_entry")

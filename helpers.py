@@ -25,7 +25,7 @@ def find_dissector(fpath):
     sig2dissector = [
         (r'GPG symmetrically encrypted data', gpg.analyze),
         (r'ELF 32-bit (LSB|MSB) (executable|relocatable)', elf32.analyze),
-        (r'ELF 64-bit (LSB|MSB) (executable|relocatable)', elf32.analyze),
+        (r'ELF 64-bit (LSB|MSB) (executable|relocatable)', elf64.analyze),
         (r'PE32 executable .* 80386', pe32.analyze),
         (r'PE32\+ executable .* x86-64', pe64.analyze),
         (r'Dalvik dex file', dex.analyze),
