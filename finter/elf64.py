@@ -67,7 +67,7 @@ def analyze(fp):
         sh_flags = uint64(fp, 1)
         tag(fp, 8, "sh_flags=0x%X (%s)" % \
             (sh_flags, sh_flags_tostr(sh_flags)))
-        tagUint64(fp, "sh_addr")
+        sh_addr = tagUint64(fp, "sh_addr")
         sh_offset = tagUint64(fp, "sh_offset")
         sh_size = tagUint64(fp, "sh_size")
         tagUint32(fp, "sh_link")
@@ -85,6 +85,8 @@ def analyze(fp):
             symtab = [sh_offset, sh_size]
         if strName == '.strtab':
             strtab = [sh_offset, sh_size]
+        if strName == '.opd':
+            opd = [sh_offset, sh_size, sh_addr]
 
         print('[0x%X,0x%X) elf64_shdr "%s" %s' % \
             (oHdr, fp.tell(), scnStrTab[sh_name], strType))
@@ -115,6 +117,8 @@ def analyze(fp):
             if d_tag == DT_NULL:
                 break
 
+    symtab_name2addr = {}
+    symtab_addr2name = {}
     if symtab:
         # .symbtab is an array of Elf64_Sym entries
         # note that Elf64_Sym differs from Elf32_Sym beyond field sizes
@@ -136,6 +140,29 @@ def analyze(fp):
             st_size = tagUint64(fp, "st_size")
             fp.seek(tmp)
             tag(fp, SIZE_ELF64_SYM, "Elf64_Sym \"%s\"" % nameStr)
+
+            symtab_name2addr[nameStr] = st_value
+            symtab_addr2name[st_value] = nameStr
+
+    if opd and E_MACHINE(e_machine) == E_MACHINE.EM_PPC64:
+        [offs, size, scn_vaddr_base] = opd
+        fp.seek(offs)
+        func_descr_idx = 0
+        while fp.tell() < (offs + size):
+            tmp = fp.tell()
+            tagUint64(fp, "entry")
+            tagUint64(fp, "toc")
+            tagUint64(fp, "environ")
+
+            addr = scn_vaddr_base + (fp.tell() - offs)
+
+            fp.seek(tmp)
+            if addr in symtab_addr2name:
+                tag(fp, 24, "descriptor \"%s\"" % symtab_addr2name[addr])
+            else:
+                tag(fp, 24, "descriptor %d" % func_descr_idx)
+
+            func_descr_idx += 1
 
     # read program headers
     fp.seek(e_phoff)
