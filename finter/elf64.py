@@ -30,8 +30,9 @@ def analyze(fp):
     tag(fp, 7, "e_ident[EI_PAD]")
     assert fp.tell() == 16
     e_type = uint16(fp, 1)
-    tagUint16(fp, "e_type %s" % e_type_tostr(e_type))    
-    tagUint16(fp, "e_machine")
+    tagUint16(fp, "e_type %s" % e_type_tostr(e_type))
+    e_machine = uint16(fp, 1)
+    tagUint16(fp, "e_machine %s" % (e_machine_tostr(e_machine)))
     tagUint32(fp, "e_version")
     tagUint64(fp, "e_entry")
     e_phoff = tagUint64(fp, "e_phoff")
@@ -43,7 +44,7 @@ def analyze(fp):
     tagUint16(fp, "e_shentsize")
     e_shnum = tagUint16(fp, "e_shnum")
     e_shstrndx = tagUint16(fp, "e_shstrndx")
-    
+
     # read the string table
     fp.seek(e_shoff + e_shstrndx*SIZE_ELF64_SHDR)
     tmp = fp.tell()
@@ -51,7 +52,7 @@ def analyze(fp):
     (a,b,c,d,sh_offset,sh_size) = struct.unpack(fmt, fp.read(40))
     fp.seek(sh_offset)
     scnStrTab = StringTable(fp, sh_size)
-    
+
     # read all section headers
     dynamic = None
     symtab = None
@@ -73,10 +74,10 @@ def analyze(fp):
         tagUint32(fp, "sh_info")
         tagUint64(fp, "sh_addralign")
         tagUint64(fp, "sh_entsize")
-    
+
         strType = sh_type_tostr(sh_type)
         strName = scnStrTab[sh_name]
-    
+
         # store info on special sections
         if strName == '.dynamic':
             dynamic = [sh_offset, sh_size]
@@ -87,7 +88,7 @@ def analyze(fp):
 
         print('[0x%X,0x%X) elf64_shdr "%s" %s' % \
             (oHdr, fp.tell(), scnStrTab[sh_name], strType))
-    
+
         if(not sh_type in [SHT_NULL, SHT_NOBITS]):
             print('[0x%X,0x%X) section "%s" contents' % \
                 (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
@@ -109,7 +110,7 @@ def analyze(fp):
             tag(fp, 8, "d_tag:0x%X (%s)" % (d_tag, tagStr))
             tagUint64(fp, "val_ptr")
             fp.seek(tmp)
-            tag(fp, SIZE_ELF64_DYN, "Elf64_Dyn (%s)" % tagStr)        
+            tag(fp, SIZE_ELF64_DYN, "Elf64_Dyn (%s)" % tagStr)
 
             if d_tag == DT_NULL:
                 break
@@ -148,9 +149,9 @@ def analyze(fp):
         tagUint64(fp, "p_filesz")
         tagUint64(fp, "p_memsz")
         tagUint64(fp, "p_align")
-    
+
         strType = phdr_type_tostr(p_type)
-    
+
         print('[0x%X,0x%X) elf64_phdr %d %s' % \
             (oHdr, fp.tell(), i, strType))
 
