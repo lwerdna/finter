@@ -154,11 +154,11 @@ def analyze(fp):
             tagUint64(fp, "toc")
             tagUint64(fp, "environ")
 
-            addr = scn_vaddr_base + (fp.tell() - offs)
+            vaddr = scn_vaddr_base + (tmp - offs)
 
             fp.seek(tmp)
-            if addr in symtab_addr2name:
-                tag(fp, 24, "descriptor \"%s\"" % symtab_addr2name[addr])
+            if vaddr in symtab_addr2name:
+                tag(fp, 24, "descriptor \"%s\"" % symtab_addr2name[vaddr])
             else:
                 tag(fp, 24, "descriptor %d" % func_descr_idx)
 
