@@ -47,7 +47,9 @@ def find_dissector(fpath):
                 if re.match(r'[XDQ][HL][234]\x0a', fp.read(4).decode('utf-8')):
                     analyze = rel.analyze
         elif fpath.endswith('.ihx'):
-        	analyze = ihx.analyze
+            analyze = ihx.analyze
+        elif fpath.endswith('.mkv'):
+            analyze = mkv.analyze
 
     return analyze
 
