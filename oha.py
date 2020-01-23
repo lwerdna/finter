@@ -26,24 +26,63 @@ class ohaNode():
         for child in self.children:
             child.setfp(fp)
 
-    def __str__(self, depth=0):
-        indent = '.'*depth
+    def pprint(self, depth=0):
+        addr = self.interval.begin
+        length = self.interval.length()
+        end = addr + length
+        comment = self.interval.data
+        if comment:
+            comment = '.'*depth + comment
 
-        if self.children:
-            result = (75)*' ' + indent + CYAN + str(self.interval.data) + NORMAL + '\n'
-            for c in sorted(self.children, key=lambda x: x.interval.begin):
-                result += c.__str__(depth+1)
-        else:
-            addr = self.interval.begin
+        # base case: no children, just print oha
+        if not self.children:
             self.fp.seek(addr)
-            data = self.fp.read(self.interval.length())
-            result = oha_comment(data, addr, indent + self.interval.data)
 
-        return result + '\n'
+            if length > 1024:
+                addr = (addr + 1024) & 0xFFFFFFFFFFFFFFFF0
+                data = self.fp.read(1024)
+                oha(data, addr, comment)
+                print('%s~~~~~~~~%s' % (YELLOW, NORMAL))
+            else:
+                data = self.fp.read(length)
+                oha(data, addr, comment)
 
-def oha(data, addr):
+            return
+
+        # recur on gaps, children
+        children = sorted(self.children, key=lambda x: x.interval.begin)
+
+        # write our own name, either on the initial fragment...
+        if addr < children[0].interval.begin:
+            tmp = ohaNode(Interval(addr, children[0].interval.begin, self.interval.data))
+            tmp.setfp(self.fp)
+            tmp.pprint(depth)
+            addr = children[0].interval.begin
+        # ... or on empty line
+        else:
+            oha('', self.interval.begin, comment)
+
+        for child in children:
+            cbegin = child.interval.begin
+            # gap
+            if addr < cbegin:
+                tmp = ohaNode(Interval(addr, cbegin, 'fragment'))
+                tmp.setfp(self.fp)
+                tmp.pprint(depth+1)
+                addr = cbegin
+
+            assert addr == cbegin
+            child.pprint(depth+1)
+            addr = cbegin + child.interval.length()
+        # recur on gap after last child
+        if addr < end:
+            tmp = ohaNode(Interval(addr, end, 'fragment'))
+            tmp.setfp(self.fp)
+            tmp.pprint(depth+1)
+
+def oha(data, addr, comment=None):
     """ offset, hex, ascii (OHA) of data """
-   
+
     result = []
     va_lo = addr
     va_hi = addr + len(data)
@@ -61,22 +100,16 @@ def oha(data, addr):
                 hex_str += '   '
                 ascii_str += ' '
 
-        result.append('%s%08X%s %s %s%s%s' % (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL))
+        if comment:
+            print('%s%08X%s %s %s%s%s %s%s%s' % \
+                (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL, CYAN, comment, NORMAL))
+            comment = ''
+        else:
+            print('%s%08X%s %s %s%s%s' % (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL))
+
         va += 16
 
     return '\n'.join(result)
-
-def oha_comment(data, addr, comment):
-    """ OHA view with comment """
-    tmp = oha(data, addr)
-
-    comment = CYAN + comment + NORMAL
-
-    if '\n' in tmp:
-        (left,right) = tmp.split('\n', 1)
-        return left + ' ' + comment + '\n' + right
-    else:
-        return tmp + ' ' + comment
 
 if __name__ == '__main__':
 
@@ -105,5 +138,5 @@ if __name__ == '__main__':
 
     with open(sys.argv[1], 'rb') as fp:
         root.setfp(fp)
-        print(root)
+        root.pprint()
     
