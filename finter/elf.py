@@ -240,7 +240,11 @@ class E_MACHINE(Enum):
     EM_CSKY = 252     #  C-SKY
 
 def e_machine_tostr(em):
-	return E_MACHINE(em).name
+	try:
+		name = E_MACHINE(em).name
+	except ValueError:
+		name = '(UNKNOWN %d)' % (em, em)
+	return name
 
 # section header type
 SHT_NULL = 0
