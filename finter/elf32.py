@@ -175,6 +175,5 @@ def analyze(fp):
             (oHdr, fp.tell(), i, strType))
 
 if __name__ == '__main__':
-    import sys
     with open(sys.argv[1], 'rb') as fp:
         analyze(fp)

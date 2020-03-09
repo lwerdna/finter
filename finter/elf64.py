@@ -13,7 +13,7 @@ from .helpers import *
 
 def analyze(fp):
     if not isElf64(fp):
-   		return
+           return
     tag(fp, SIZE_ELF64_HDR, "elf64_hdr", 1)
     tag(fp, 4, "e_ident[0..4)")
     tagUint8(fp, "e_ident[EI_CLASS] (64-bit)")
@@ -144,6 +144,7 @@ def analyze(fp):
             symtab_name2addr[nameStr] = st_value
             symtab_addr2name[st_value] = nameStr
 
+    opd = False
     if opd and E_MACHINE(e_machine) == E_MACHINE.EM_PPC64:
         [offs, size, scn_vaddr_base] = opd
         fp.seek(offs)
@@ -183,6 +184,6 @@ def analyze(fp):
             (oHdr, fp.tell(), i, strType))
 
 if __name__ == '__main__':
-	import sys
-	with open(sys.argv[1], 'rb') as fp:
-	    analyze(fp)
+    import sys
+    with open(sys.argv[1], 'rb') as fp:
+        analyze(fp)
