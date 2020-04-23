@@ -49,15 +49,8 @@ class sankeyNode():
 
 if __name__ == '__main__':
     fpath = sys.argv[1]
-    lines = dissect_file(fpath)
-    if not lines:
-        print('no file dissectors answered the call')
-        sys.exit(-1)
-
-    intervals = intervals_from_text(lines)
-    tree = IntervalTree(intervals)
+    tree = dissect_file(fpath)
     root = interval_tree_to_hierarchy(tree, sankeyNode)
-
     root.assign_index()
 
     labels = [index2descr[x] for x in range(len(index2descr))]

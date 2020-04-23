@@ -12,17 +12,9 @@ from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarch
 import plotly.figure_factory as ff
 import numpy as np
 
-
 if __name__ == '__main__':
 
-    lines = dissect_file(sys.argv[1])
-    if not lines:
-        print('no file dissectors answered the call')
-        sys.exit(-1)
-
-    intervals = intervals_from_text(lines)
-    print('%d intervals' % len(intervals))
-    tree = IntervalTree(intervals)    
+    tree = dissect_file(sys.argv[1])
 
     leaves = [i for i in tree if len(tree.envelop(i))==1]
     print('%d leaves' % len(leaves))

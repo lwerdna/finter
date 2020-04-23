@@ -19,13 +19,6 @@ def print_recur(hnode, depth=0):
         print_recur(child, depth+1)
 
 if __name__ == '__main__':
-    lines = dissect_file(sys.argv[1])
-    if not lines:
-        print('no file dissectors answered the call')
-        sys.exit(-1)
-
-    intervals = intervals_from_text(lines)
-    tree = IntervalTree(intervals)
+    tree = dissect_file(sys.argv[1])
     hnRoot = interval_tree_to_hierarchy(tree)
-
     print_recur(hnRoot)

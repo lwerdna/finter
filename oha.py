@@ -16,7 +16,7 @@ YELLOW = '\x1B[93m'
 CYAN = '\x1B[96m'
 NORMAL = '\x1B[0m'
 
-class ohaNode():
+class OhaNode():
     def __init__(self, interval):
         self.interval = interval
         self.children = []
@@ -27,59 +27,29 @@ class ohaNode():
             child.setfp(fp)
 
     def pprint(self, depth=0):
+        truncate = True
         addr = self.interval.begin
-        length = self.interval.length()
-        end = addr + length
-        comment = self.interval.data
-        if comment:
-            comment = '.'*depth + comment
+        comment = '  '*depth + self.interval.data
 
-        # base case: no children, just print oha
-        if not self.children:
-            self.fp.seek(addr)
-
-            #if length > 1024:
-            if False:
-                addr = (addr + 1024) & 0xFFFFFFFFFFFFFFFF0
-                data = self.fp.read(1024)
-                oha(data, addr, comment)
-                print('%s~~~~~~~~%s' % (YELLOW, NORMAL))
-            else:
-                data = self.fp.read(length)
-                oha(data, addr, comment)
-
-            return
-
-        # recur on gaps, children
-        children = sorted(self.children, key=lambda x: x.interval.begin)
-
-        # write our own name, either on the initial fragment...
-        if addr < children[0].interval.begin:
-            tmp = ohaNode(Interval(addr, children[0].interval.begin, self.interval.data))
-            tmp.setfp(self.fp)
-            tmp.pprint(depth)
-            addr = children[0].interval.begin
-        # ... or on empty line
+        if self.children:
+            oha_comment(addr, comment)
+            for child in sorted(self.children, key=lambda x: x.interval.begin):
+                child.pprint(depth+1)
         else:
-            oha('', self.interval.begin, comment)
+            #if length > 1024:
+            length = self.interval.length()
+            self.fp.seek(addr)
+            data = self.fp.read(length)
 
-        for child in children:
-            cbegin = child.interval.begin
-            # gap
-            if addr < cbegin:
-                tmp = ohaNode(Interval(addr, cbegin, 'fragment'))
-                tmp.setfp(self.fp)
-                tmp.pprint(depth+1)
-                addr = cbegin
+            if truncate and length > 1024:
+                oha(data[0:512], addr, comment)
+                print('%s~~~~~~~~%s' % (YELLOW, NORMAL))
+                oha(data[-512:], addr + length - 512, comment)
+            else:
+                oha(data, addr, comment)
 
-            assert addr == cbegin
-            child.pprint(depth+1)
-            addr = cbegin + child.interval.length()
-        # recur on gap after last child
-        if addr < end:
-            tmp = ohaNode(Interval(addr, end, 'fragment'))
-            tmp.setfp(self.fp)
-            tmp.pprint(depth+1)
+def oha_comment(addr, comment):
+    print(75*' '+CYAN+comment+NORMAL)
 
 def oha(data, addr, comment=None):
     """ offset, hex, ascii (OHA) of data """
@@ -123,21 +93,23 @@ if __name__ == '__main__':
 #    print('--')
 #    print(oha_comment(b'\x00\x00\x00\x00', 0x180CC0, 'sh_addr=0'))
 
-    if not sys.argv[1:]:
+    if len(sys.argv) < 2:
         print('ERROR: missing file parameter')
         print('usage: %s <file>' % sys.argv[0])
         sys.exit(-1)
+    
+    fpath = sys.argv[1]
 
-    lines = dissect_file(sys.argv[1])
-    if not lines:
-        print('no file dissectors answered the call')
-        sys.exit(-1)
+    interval_tree = dissect_file(fpath)
 
-    intervals = intervals_from_text(lines)
-    tree = IntervalTree(intervals)
-    root = interval_tree_to_hierarchy(tree, ohaNode)
+    root = interval_tree_to_hierarchy(interval_tree, OhaNode)
+
+    sorted_children = sorted(root.children, key=lambda x: x.interval.begin)
+    #for top_level_node in sorted_children:
+    #    print('0x%08X: %s' % (top_level_node.interval.begin, str(top_level_node.interval)))
 
     with open(sys.argv[1], 'rb') as fp:
         root.setfp(fp)
-        root.pprint()
+        for ch in sorted_children:
+            ch.pprint()
     
