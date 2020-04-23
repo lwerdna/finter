@@ -38,7 +38,8 @@ class ohaNode():
         if not self.children:
             self.fp.seek(addr)
 
-            if length > 1024:
+            #if length > 1024:
+            if False:
                 addr = (addr + 1024) & 0xFFFFFFFFFFFFFFFF0
                 data = self.fp.read(1024)
                 oha(data, addr, comment)

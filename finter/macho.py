@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # references (if you have it):
 # source:
@@ -10,6 +10,8 @@
 import sys
 import binascii
 from struct import unpack
+
+from enum import Enum
 
 from .helpers import *
 
@@ -35,7 +37,7 @@ MH_DSYM = 0xA
 MH_KEXT_BUNDLE = 0xB
 lookup_filetype = {MH_OBJECT:'MH_OBJECT', MH_EXECUTE:'MH_EXECUTE', MH_FVMLIB:'MH_FVMLIB',
     MH_CORE:'MH_CORE', MH_PRELOAD:'MH_PRELOAD', MH_DYLIB:'MH_DYLIB', MH_DYLINKER:'MH_DYLINKER',
-    MH_BUNDLE:'MH_BUNDLE', MH_DYLIB_STUB:'MH_DYLIB_STUB', MH_DSYM:'MH_DSYM', 
+    MH_BUNDLE:'MH_BUNDLE', MH_DYLIB_STUB:'MH_DYLIB_STUB', MH_DSYM:'MH_DSYM',
     MH_KEXT_BUNDLE:'MH_KEXT_BUNDLE'}
 
 # CPU type constants
@@ -56,9 +58,9 @@ CPU_TYPE_I860 = 15
 CPU_TYPE_ALPHA = 16
 CPU_TYPE_POWERPC = 18
 CPU_TYPE_POWERPC64 = CPU_TYPE_POWERPC | CPU_ARCH_ABI64
-lookup_cputype = {CPU_TYPE_ANY:'CPU_TYPE_ANY', CPU_TYPE_VAX:'CPU_TYPE_VAX', 
-    CPU_TYPE_MC680x0:'CPU_TYPE_MC680x0', CPU_TYPE_X86:'CPU_TYPE_X86', CPU_TYPE_I386:'CPU_TYPE_I386', 
-    CPU_TYPE_X86_64:'CPU_TYPE_X86_64', CPU_TYPE_MIPS:'CPU_TYPE_MIPS', CPU_TYPE_MC98000:'CPU_TYPE_MC98000', 
+lookup_cputype = {CPU_TYPE_ANY:'CPU_TYPE_ANY', CPU_TYPE_VAX:'CPU_TYPE_VAX',
+    CPU_TYPE_MC680x0:'CPU_TYPE_MC680x0', CPU_TYPE_X86:'CPU_TYPE_X86', CPU_TYPE_I386:'CPU_TYPE_I386',
+    CPU_TYPE_X86_64:'CPU_TYPE_X86_64', CPU_TYPE_MIPS:'CPU_TYPE_MIPS', CPU_TYPE_MC98000:'CPU_TYPE_MC98000',
     CPU_TYPE_HPPA:'CPU_TYPE_HPPA', CPU_TYPE_ARM:'CPU_TYPE_ARM', CPU_TYPE_MC88000:'CPU_TYPE_MC88000',
     CPU_TYPE_SPARC:'CPU_TYPE_SPARC', CPU_TYPE_I860:'CPU_TYPE_I860', CPU_TYPE_ALPHA:'CPU_TYPE_ALPHA',
     CPU_TYPE_POWERPC:'CPU_TYPE_POWERPC', CPU_TYPE_POWERPC64:'CPU_TYPE_POWERPC64'
@@ -127,54 +129,55 @@ MH_NO_HEAP_EXECUTION = 0x01000000
 MH_APP_EXTENSION_SAFE = 0x02000000
 
 # Constants for the cmd field of all load commands, the type
-LC_REQ_DYLD = 0x80000000
-LC_SEGMENT = 0x1
-LC_SYMTAB = 0x2
-LC_SYMSEG = 0x3
-LC_THREAD = 0x4
-LC_UNIXTHREAD = 0x5
-LC_LOADFVMLIB = 0x6
-LC_IDFVMLIB = 0x7
-LC_IDENT = 0x8
-LC_FVMFILE = 0x9
-LC_PREPAGE = 0xa    
-LC_DYSYMTAB = 0xb
-LC_LOAD_DYLIB = 0xc
-LC_ID_DYLIB = 0xd
-LC_LOAD_DYLINKER = 0xe
-LC_ID_DYLINKER = 0xf
-LC_PREBOUND_DYLIB = 0x10
-LC_ROUTINES = 0x11
-LC_SUB_FRAMEWORK = 0x12
-LC_SUB_UMBRELLA = 0x13
-LC_SUB_CLIENT = 0x14
-LC_SUB_LIBRARY  = 0x15
-LC_TWOLEVEL_HINTS = 0x16
-LC_PREBIND_CKSUM  = 0x17
-LC_LOAD_WEAK_DYLIB = (0x18 | LC_REQ_DYLD)
-LC_SEGMENT_64 = 0x19
-LC_ROUTINES_64 = 0x1a
-LC_UUID = 0x1b
-LC_RPATH = (0x1c | LC_REQ_DYLD)   
-LC_CODE_SIGNATURE = 0x1d
-LC_SEGMENT_SPLIT_INFO = 0x1e
-LC_REEXPORT_DYLIB = (0x1f | LC_REQ_DYLD)
-LC_LAZY_LOAD_DYLIB = 0x20
-LC_ENCRYPTION_INFO = 0x21
-LC_DYLD_INFO  = 0x22
-LC_DYLD_INFO_ONLY = (0x22|LC_REQ_DYLD)
-LC_LOAD_UPWARD_DYLIB = (0x23 | LC_REQ_DYLD)
-LC_VERSION_MIN_MACOSX = 0x24  
-LC_VERSION_MIN_IPHONEOS = 0x25
-LC_FUNCTION_STARTS = 0x26
-LC_DYLD_ENVIRONMENT = 0x27
-LC_MAIN = (0x28|LC_REQ_DYLD)
-LC_DATA_IN_CODE = 0x29
-LC_SOURCE_VERSION = 0x2A
-LC_DYLIB_CODE_SIGN_DRS = 0x2B
-LC_ENCRYPTION_INFO_64 = 0x2C
-LC_LINKER_OPTION = 0x2D
-LC_LINKER_OPTIMIZATION_HINT = 0x2E
+class LOAD_COMMAND_TYPE(Enum):
+	LC_REQ_DYLD = 0x80000000
+	LC_SEGMENT = 0x1
+	LC_SYMTAB = 0x2
+	LC_SYMSEG = 0x3
+	LC_THREAD = 0x4
+	LC_UNIXTHREAD = 0x5
+	LC_LOADFVMLIB = 0x6
+	LC_IDFVMLIB = 0x7
+	LC_IDENT = 0x8
+	LC_FVMFILE = 0x9
+	LC_PREPAGE = 0xa
+	LC_DYSYMTAB = 0xb
+	LC_LOAD_DYLIB = 0xc
+	LC_ID_DYLIB = 0xd
+	LC_LOAD_DYLINKER = 0xe
+	LC_ID_DYLINKER = 0xf
+	LC_PREBOUND_DYLIB = 0x10
+	LC_ROUTINES = 0x11
+	LC_SUB_FRAMEWORK = 0x12
+	LC_SUB_UMBRELLA = 0x13
+	LC_SUB_CLIENT = 0x14
+	LC_SUB_LIBRARY  = 0x15
+	LC_TWOLEVEL_HINTS = 0x16
+	LC_PREBIND_CKSUM  = 0x17
+	LC_LOAD_WEAK_DYLIB = (0x18 | LC_REQ_DYLD)
+	LC_SEGMENT_64 = 0x19
+	LC_ROUTINES_64 = 0x1a
+	LC_UUID = 0x1b
+	LC_RPATH = (0x1c | LC_REQ_DYLD)
+	LC_CODE_SIGNATURE = 0x1d
+	LC_SEGMENT_SPLIT_INFO = 0x1e
+	LC_REEXPORT_DYLIB = (0x1f | LC_REQ_DYLD)
+	LC_LAZY_LOAD_DYLIB = 0x20
+	LC_ENCRYPTION_INFO = 0x21
+	LC_DYLD_INFO  = 0x22
+	LC_DYLD_INFO_ONLY = (0x22|LC_REQ_DYLD)
+	LC_LOAD_UPWARD_DYLIB = (0x23 | LC_REQ_DYLD)
+	LC_VERSION_MIN_MACOSX = 0x24
+	LC_VERSION_MIN_IPHONEOS = 0x25
+	LC_FUNCTION_STARTS = 0x26
+	LC_DYLD_ENVIRONMENT = 0x27
+	LC_MAIN = (0x28|LC_REQ_DYLD)
+	LC_DATA_IN_CODE = 0x29
+	LC_SOURCE_VERSION = 0x2A
+	LC_DYLIB_CODE_SIGN_DRS = 0x2B
+	LC_ENCRYPTION_INFO_64 = 0x2C
+	LC_LINKER_OPTION = 0x2D
+	LC_LINKER_OPTIMIZATION_HINT = 0x2E
 
 ###############################################################################
 # "main"
@@ -227,13 +230,15 @@ def analyze(fp):
     tagUint32(fp, "flags")
     if is64:
         tagUint32(fp, "reserved")
-    
+
     for i in range(ncmds):
         oCmd = fp.tell()
         cmd = tagUint32(fp, "cmd")
         cmdSize = tagUint32(fp, "cmdsize") # includes cmd,cmdsize
-        
-        if cmd == LC_SEGMENT_64:
+
+        cmd = LOAD_COMMAND_TYPE(cmd)
+
+        if cmd == LOAD_COMMAND_TYPE.LC_SEGMENT_64:
             segname = tagString(fp, 16, "segname")
             tagUint64(fp, "vmaddr")
             tagUint64(fp, "vmsize")
@@ -243,7 +248,7 @@ def analyze(fp):
             tagUint32(fp, "initprot")
             nsects = tagUint32(fp, "nsects")
             flags = tagUint32(fp, "flags")
-           
+
             for j in range(nsects):
                 oScn = fp.tell()
                 sectname = tagString(fp, 16, "sectname")
@@ -260,35 +265,39 @@ def analyze(fp):
                 tagUint32(fp, "reserved3")
                 print('[0x%X,0x%X) section_64 \"%s\" %d/%d' % \
                     (oScn, fp.tell(), sectname, j+1, nsects))
-    
+
             print('[0x%X,0x%X) segment_command_64 \"%s\"' % \
                 (oCmd, fp.tell(), segname))
-        
-        elif cmd == LC_LOAD_DYLIB:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_LOAD_DYLIB:
             # parse the dylib
-            tag(fp, 16, "dylib", 1)
+            #tag(fp, 16, "dylib", 1)
             lc_str = tagUint32(fp, "lc_str")
             tagUint32(fp, "timestamp")
             tagUint32(fp, "current_version")
             tagUint32(fp, "compatibility_version")
-    
+
             # parse the string after the dylib (but before the end of the command)
             fp.seek(oCmd + lc_str)
+
             path = fp.read(cmdSize - lc_str).rstrip(b'\x00')
-    
+
+            print('[0x%X,0x%X) path "%s"' % \
+            	(oCmd+lc_str, oCmd+cmdSize, path))
+
             print('[0x%X,0x%X) dylib_command \"%s\"' % \
                 (oCmd, oCmd+cmdSize, path))
-    
-        elif cmd == LC_LOAD_DYLINKER:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_LOAD_DYLINKER:
             lc_str = tagUint32(fp, "lc_str")
             # parse the string after the dylinker_command (but before the end of the command)
             fp.seek(oCmd + lc_str)
             path = fp.read(cmdSize - lc_str).rstrip(b'\x00')
-    
+
             print('[0x%X,0x%X) dylnker_command \"%s\"' % \
                 (oCmd, oCmd+cmdSize, path))
-    
-        elif (cmd == LC_DYLD_INFO) or (cmd == LC_DYLD_INFO_ONLY):
+
+        elif (cmd == LOAD_COMMAND_TYPE.LC_DYLD_INFO) or (cmd == LOAD_COMMAND_TYPE.LC_DYLD_INFO_ONLY):
             tagUint32(fp, "rebase_off")
             tagUint32(fp, "rebase_size")
             tagUint32(fp, "bind_off")
@@ -301,21 +310,21 @@ def analyze(fp):
             tagUint32(fp, "export_size")
             print('[0x%X,0x%X) dyld_info_command' % \
                 (oCmd, fp.tell()))
-    
-        elif cmd == LC_SYMTAB:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_SYMTAB:
             tagUint32(fp, "symoff")
             tagUint32(fp, "nsyms")
             tagUint32(fp, "stroff")
             tagUint32(fp, "strsize")
             print('[0x%X,0x%X) symtab_command' % \
                 (oCmd, fp.tell()))
-    
-        elif cmd == LC_UUID:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_UUID:
             uuid = tag(fp, 16, "uuid")
             print('[0x%X,0x%X) uuid_command "%s"' % \
                 (oCmd, oCmd+cmdSize, binascii.hexlify(uuid)))
-    
-        elif cmd == LC_VERSION_MIN_MACOSX or cmd == LC_VERSION_MIN_IPHONEOS:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_VERSION_MIN_MACOSX or cmd == LOAD_COMMAND_TYPE.LC_VERSION_MIN_IPHONEOS:
             version = tagUint32(fp, "version")
             x = (version & 0xFFFF0000) >> 16
             y = (version & 0x0000FF00) >> 8
@@ -328,8 +337,8 @@ def analyze(fp):
             strSdk = '%d.%d.%d' % (x,y,z)
             print('[0x%X,0x%X) version_min_command ver=%s sdk=%s' % \
                 (oCmd, oCmd+cmdSize, strVersion, strSdk))
-            
-        elif cmd == LC_SOURCE_VERSION:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_SOURCE_VERSION:
             version = tagUint64(fp, "version")
             a = (0xFFFFFF0000000000 & version) >> 40
             b = (0x000000FFC0000000 & version) >> 30
@@ -338,27 +347,27 @@ def analyze(fp):
             e = (0x00000000000003FF & version) >> 0
             print('[0x%X,0x%X) source_version_command %s.%s.%s.%s.%s' % \
                 (oCmd, oCmd+cmdSize, str(a), str(b), str(c), str(d), str(e)))
-    
-        elif cmd in [LC_CODE_SIGNATURE, LC_SEGMENT_SPLIT_INFO, LC_FUNCTION_STARTS, LC_DATA_IN_CODE]:
-            extra = {LC_CODE_SIGNATURE:'signature', LC_SEGMENT_SPLIT_INFO:'splitinfo',
-                LC_FUNCTION_STARTS:'function_starts', LC_DATA_IN_CODE:'data_in_code'}[cmd]
-    
+
+        elif cmd in [LOAD_COMMAND_TYPE.LC_CODE_SIGNATURE, LOAD_COMMAND_TYPE.LC_SEGMENT_SPLIT_INFO, LOAD_COMMAND_TYPE.LC_FUNCTION_STARTS, LOAD_COMMAND_TYPE.LC_DATA_IN_CODE]:
+            extra = {LOAD_COMMAND_TYPE.LC_CODE_SIGNATURE:'signature', LOAD_COMMAND_TYPE.LC_SEGMENT_SPLIT_INFO:'splitinfo',
+                LOAD_COMMAND_TYPE.LC_FUNCTION_STARTS:'function_starts', LOAD_COMMAND_TYPE.LC_DATA_IN_CODE:'data_in_code'}[cmd]
+
             tagUint32(fp, "dataoffs")
             tagUint32(fp, "datasize")
             print('[0x%X,0x%X) linkedit_data_command %s' % \
                 (oCmd, oCmd+cmdSize, extra))
-    
-        elif cmd == LC_MAIN:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_MAIN:
             entrypoint = tagUint32(fp, "entryoff")
             tagUint32(fp, "stacksize")
             print('[0x%X,0x%X) entry_point_command (main @0x%08X)' % \
                 (oCmd, oCmd+cmdSize, entrypoint))
             if fp.tell() < (oCmd+cmdSize):
                 tag(fp, oCmd+cmdSize-fp.tell(), "padding")
-    
-        #elif cmd == LC_DATA_IN_CODE:
-    
-        elif cmd == LC_DYSYMTAB:
+
+        #elif cmd == LOAD_COMMAND_TYPE.LC_DATA_IN_CODE:
+
+        elif cmd == LOAD_COMMAND_TYPE.LC_DYSYMTAB:
             tagUint32(fp, "ilocalsym")
             tagUint32(fp, "nlocalsym")
             tagUint32(fp, "iextdefsym")
@@ -379,10 +388,10 @@ def analyze(fp):
             tagUint32(fp, "nlocrel")
             print('[0x%X,0x%X) dysymtab_command' % \
                 (oCmd, fp.tell()))
-    
+
         else:
-            print('[0x%X,0x%X) unknown command 0x%X (%d)' % \
-                (oCmd, oCmd+cmdSize, cmd, cmd))
+            print('[0x%X,0x%X) command %s' % \
+                (oCmd, oCmd+cmdSize, LOAD_COMMAND_TYPE(cmd).name))
             fp.seek(oCmd+cmdSize)
 
 if __name__ == '__main__':
