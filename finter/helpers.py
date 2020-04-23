@@ -215,11 +215,9 @@ def uleb128(FP, peek=0):
 
 # strings (eats trailing nulls)
 def string(FP, length, peek=0):
-    value = unpack('%ds' % length, FP.read(length))[0]
-    while(value and value[-1]=='\x00'):
-        value = value[0:-1]
+    binary = FP.read(length).rstrip(b'\x00')
     if peek: FP.seek(-1*length, 1)
-    return value
+    return binary.decode('utf-8')
 
 #
 def dataUntil(FP, terminator, peek=0):
