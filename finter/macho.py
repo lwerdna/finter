@@ -279,7 +279,7 @@ def analyze(fp):
 
             # parse the string after the dylib (but before the end of the command)
             fp.seek(oCmd + lc_str)
-            path = string(fp, cmdSize - lc_str) 
+            path = string(fp, cmdSize - lc_str)
 
             print('[0x%X,0x%X) path "%s"' % \
                 (oCmd+lc_str, oCmd+cmdSize, path))
@@ -291,7 +291,7 @@ def analyze(fp):
             lc_str = tagUint32(fp, "lc_str")
             # parse the string after the dylinker_command (but before the end of the command)
             fp.seek(oCmd + lc_str)
-            path = string(fp, cmdSize - lc_str) 
+            path = string(fp, cmdSize - lc_str)
 
             print('[0x%X,0x%X) dylnker_command \"%s\"' % \
                 (oCmd, oCmd+cmdSize, path))
@@ -347,8 +347,6 @@ def analyze(fp):
             print('[0x%X,0x%X) source_version_command %s.%s.%s.%s.%s' % \
                 (oCmd, oCmd+cmdSize, str(a), str(b), str(c), str(d), str(e)))
 
-
-
         elif cmd == LOAD_COMMAND_TYPE.LC_MAIN:
             entrypoint = tagUint32(fp, "entryoff")
             tagUint32(fp, "stacksize")
@@ -362,12 +360,18 @@ def analyze(fp):
             length = tagUint32(fp, 'data length')
             print('[0x%X,0x%X) %s' % (oCmd, oCmd+cmdSize, cmd.name))
 
-            fp.seek(offs)
-            tag(fp, length, '%s data'%cmd.name, True)
-            idx = 0
-            while fp.tell() < offs+length:
-                tagUleb128(fp, 'entry%d' % idx)
-                idx += 1
+            if length:
+                fp.seek(offs)
+                tag(fp, length, '%s data'%cmd.name, True)
+                idx = 0
+                while fp.tell() < offs+length:
+                    comment = 'entry%d' % idx
+                    if not idx:
+                        comment += ' (file offset of __text)'
+                    tagUleb128(fp, comment)
+                    idx += 1
+
+            fp.seek(oCmd+cmdSize)
 
         elif cmd == LOAD_COMMAND_TYPE.LC_DYSYMTAB:
             tagUint32(fp, "ilocalsym")
