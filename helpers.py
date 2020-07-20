@@ -111,7 +111,8 @@ def find_dissector(fpath):
         (r'PE32\+ executable .* x86-64', pe64.analyze),
         (r'Dalvik dex file', dex.analyze),
         (r'MS-DOS executable', exe.analyze),
-        (r'Mach-O ', macho.analyze)
+        (r'Mach-O ', macho.analyze),
+        (r'RIFF \(little-endian\) data, WAVE audio', wav.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
