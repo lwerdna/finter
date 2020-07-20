@@ -95,10 +95,13 @@ def IsEof(FP):
     FP.seek(temp)
     return answer
 
-def peek(FP,len):
-    value = FP.read(len)
-    FP.seek(-len,1)
+def peek(FP, amt):
+    value = FP.read(amt)
+    FP.seek(-amt, 1)
     return value
+
+def rewind(FP, amt):
+	FP.seek(-amt, 1)
 
 ###############################################################################
 # endianness
