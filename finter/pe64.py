@@ -108,6 +108,7 @@ def analyze(fp):
         (e_lfanew, fp.tell()))
     
     (oScnReloc,nScnReloc)=(None,None)
+    (oScnPdata,nScnPdata)=(None,None)
     fp.seek(oIOH + SizeOfOptionalHeader)
     for i in range(NumberOfSections):
         oISH = fp.tell()
@@ -125,14 +126,19 @@ def analyze(fp):
             (oISH, fp.tell(), Name.rstrip(b'\0')))
         print("[0x%X,0x%X) section \"%s\" contents" % \
             (PointerToRawData, PointerToRawData+SizeOfRawData, Name.rstrip(b'\0')))
-    
-        if Name=='.reloc\x00\x00':
-            oScnReloc = PointerToRawData
-            nScnReloc = SizeOfRawData
-    
+
+        if Name==b'.reloc\x00\x00':
+            (oScnReloc, nScnReloc) = (PointerToRawData, SizeOfRawData)
+        elif Name==b'.pdata\x00\x00':
+            (oScnPdata, nScnPdata) = (PointerToRawData, SizeOfRawData)
+
     if(oScnReloc):
         fp.seek(oScnReloc)
         pe.tagReloc(fp, nScnReloc)
+
+    if(oScnPdata):
+        fp.seek(oScnPdata)
+        pe.tagPdata(fp, nScnPdata, 'x64' if Machine==0x8664 else '')
 
 if __name__ == '__main__':
     import sys

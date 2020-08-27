@@ -3,7 +3,7 @@
 import os
 import sys
 
-from helpers import *
+from .helpers import *
 from struct import pack, unpack
 
 IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16
@@ -116,7 +116,7 @@ def tagReloc(fp, size, machine=''):
 
         VirtualAddress = tagUint32(fp, "VirtualAddress")    
         SizeOfBlock = tagUint32(fp, "SizeOfBlock")
-        nEntries = (SizeOfBlock-8)/2
+        nEntries = (SizeOfBlock-8)//2
         print('[0x%X,0x%X) reloc block 0x%X (%d entries)' % \
           (oBlockStart, oBlockStart+SizeOfBlock, VirtualAddress, nEntries))
 
@@ -126,4 +126,16 @@ def tagReloc(fp, size, machine=''):
             rtypeStr = relocTypeToStr(rtype)
             roffs = toto&0xFFF
             tag(fp, 2, "reloc entry %d=%s offset=0x%X" % (rtype,rtypeStr,roffs))
-            
+
+def tagPdata(fp, size, machine=''):
+    if machine=='x64':
+        # struct RUNTIME_FUNCTION is 4+4+4 (begin addr, end addr, unwind info)
+        assert size % 12 == 0, 'size was 0x%X (%d) and is not divisible by 12' % (size, size)
+        current = 0
+        total = size // 12
+        while current < total:
+            tag(fp, 12, "struct RUNTIME_FUNCTION %d/%d" % (current+1, total), True)
+            tagUint32(fp, 'BeginAddress')
+            tagUint32(fp, 'EndAddress')
+            tagUint32(fp, 'UnwindInfoAddress')
+            current += 1
