@@ -72,8 +72,12 @@ def oha(data, addr, comment=None):
                 ascii_str += ' '
 
         if comment:
-            print('%s%08X%s %s %s%s%s %s%s%s' % \
-                (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL, CYAN, comment, NORMAL))
+            (cmargin, comment) = re.match(r'^(\s*)(.*)', comment).group(1, 2)
+            comment = comment.split('\\n')
+            print('%s%08X%s %s %s%s%s %s%s%s%s' % \
+                (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL, CYAN, cmargin, comment[0], NORMAL))
+            for c in comment[1:]:
+                print('%s%s%s' % (CYAN, 75*' '+cmargin + c, NORMAL))
             comment = ''
         else:
             print('%s%08X%s %s %s%s%s' % (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL))

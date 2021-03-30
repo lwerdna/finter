@@ -52,6 +52,7 @@ CPU_TYPE_MIPS = 8
 CPU_TYPE_MC98000 = 10
 CPU_TYPE_HPPA = 11
 CPU_TYPE_ARM = 12
+CPU_TYPE_ARM64 = CPU_TYPE_ARM | CPU_ARCH_ABI64
 CPU_TYPE_MC88000 = 13
 CPU_TYPE_SPARC = 14
 CPU_TYPE_I860 = 15
@@ -178,6 +179,156 @@ class LOAD_COMMAND_TYPE(Enum):
     LC_ENCRYPTION_INFO_64 = 0x2C
     LC_LINKER_OPTION = 0x2D
     LC_LINKER_OPTIMIZATION_HINT = 0x2E
+    LC_VERSION_MIN_TVOS = 0x2f
+    LC_VERSION_MIN_WATCHOS = 0x30
+    LC_NOTE = 0x31
+    LC_BUILD_VERSION = 0x32
+
+class RELOC_TYPE_GENERIC(Enum):
+    # Constant values for the r_type field in an
+    # llvm::MachO::relocation_info or llvm::MachO::scattered_relocation_info
+    # structure.
+    GENERIC_RELOC_INVALID = 0xff
+    GENERIC_RELOC_VANILLA = 0
+    GENERIC_RELOC_PAIR = 1
+    GENERIC_RELOC_SECTDIFF = 2
+    GENERIC_RELOC_PB_LA_PTR = 3
+    GENERIC_RELOC_LOCAL_SECTDIFF = 4
+    GENERIC_RELOC_TLV = 5
+
+class RELOC_TYPE_PPC(Enum):
+    # Constant values for the r_type field in a PowerPC architecture
+    # llvm::MachO::relocation_info or llvm::MachO::scattered_relocation_info
+    # structure.
+    PPC_RELOC_VANILLA = RELOC_TYPE_GENERIC.GENERIC_RELOC_VANILLA
+    PPC_RELOC_PAIR = RELOC_TYPE_GENERIC.GENERIC_RELOC_PAIR
+    PPC_RELOC_BR14 = 2
+    PPC_RELOC_BR24 = 3
+    PPC_RELOC_HI16 = 4
+    PPC_RELOC_LO16 = 5
+    PPC_RELOC_HA16 = 6
+    PPC_RELOC_LO14 = 7
+    PPC_RELOC_SECTDIFF = 8
+    PPC_RELOC_PB_LA_PTR = 9
+    PPC_RELOC_HI16_SECTDIFF = 10
+    PPC_RELOC_LO16_SECTDIFF = 11
+    PPC_RELOC_HA16_SECTDIFF = 12
+    PPC_RELOC_JBSR = 13
+    PPC_RELOC_LO14_SECTDIFF = 14
+    PPC_RELOC_LOCAL_SECTDIFF = 15
+
+class RELOC_TYPE_ARM(Enum):
+    # Constant values for the r_type field in an ARM architecture
+    # llvm::MachO::relocation_info or llvm::MachO::scattered_relocation_info
+    # structure.
+    ARM_RELOC_VANILLA = RELOC_TYPE_GENERIC.GENERIC_RELOC_VANILLA
+    ARM_RELOC_PAIR = RELOC_TYPE_GENERIC.GENERIC_RELOC_PAIR
+    ARM_RELOC_SECTDIFF = RELOC_TYPE_GENERIC.GENERIC_RELOC_SECTDIFF
+    ARM_RELOC_LOCAL_SECTDIFF = 3
+    ARM_RELOC_PB_LA_PTR = 4
+    ARM_RELOC_BR24 = 5
+    ARM_THUMB_RELOC_BR22 = 6
+    ARM_THUMB_32BIT_BRANCH = 7
+    ARM_RELOC_HALF = 8
+    ARM_RELOC_HALF_SECTDIFF = 9
+
+class RELOC_TYPE_ARM64(Enum):
+    # Constant values for the r_type field in an ARM64 architecture
+    # llvm::MachO::relocation_info or llvm::MachO::scattered_relocation_info
+    # structure.
+
+    # For pointers.
+    ARM64_RELOC_UNSIGNED = 0
+    # Must be followed by an ARM64_RELOC_UNSIGNED
+    ARM64_RELOC_SUBTRACTOR = 1
+    # A B/BL instruction with 26-bit displacement.
+    ARM64_RELOC_BRANCH26 = 2
+    # PC-rel distance to page of target.
+    ARM64_RELOC_PAGE21 = 3
+    # Offset within page, scaled by r_length.
+    ARM64_RELOC_PAGEOFF12 = 4
+    # PC-rel distance to page of GOT slot.
+    ARM64_RELOC_GOT_LOAD_PAGE21 = 5
+    # Offset within page of GOT slot, scaled by r_length.
+    ARM64_RELOC_GOT_LOAD_PAGEOFF12 = 6
+    # For pointers to GOT slots.
+    ARM64_RELOC_POINTER_TO_GOT = 7
+    # PC-rel distance to page of TLVP slot.
+    ARM64_RELOC_TLVP_LOAD_PAGE21 = 8
+    # Offset within page of TLVP slot, scaled by r_length.
+    ARM64_RELOC_TLVP_LOAD_PAGEOFF12 = 9
+    # Must be followed by ARM64_RELOC_PAGE21 or ARM64_RELOC_PAGEOFF12.
+    ARM64_RELOC_ADDEND = 10
+
+class RELOC_TYPE_X86_64(Enum):
+    # Constant values for the r_type field in an x86_64 architecture
+    # llvm::MachO::relocation_info or llvm::MachO::scattered_relocation_info
+    # structure
+    X86_64_RELOC_UNSIGNED = 0
+    X86_64_RELOC_SIGNED = 1
+    X86_64_RELOC_BRANCH = 2
+    X86_64_RELOC_GOT_LOAD = 3
+    X86_64_RELOC_GOT = 4
+    X86_64_RELOC_SUBTRACTOR = 5
+    X86_64_RELOC_SIGNED_1 = 6
+    X86_64_RELOC_SIGNED_2 = 7
+    X86_64_RELOC_SIGNED_4 = 8
+    X86_64_RELOC_TLV = 9
+
+R_ABS = 0
+R_SCATTERED = 0x80000000
+
+#struct relocation_info {
+#    int32_t r_address; // in MH_OBJECT, this is offset from start of section to address needing adjusting
+#                      // in executables loaded by dynamic loader (MH_EXECUTE, MH_DYLIB)? this is offset from
+
+#                      // if b31 (R_SCATTERED) set, this is scattered_relocation_info, not relocation_info
+#    uint32_t r_symbolnum:24,
+#    uint32_t r_pcrel:1;
+#    uint32_t r_length:2; // {1,2,4,8} bytes
+#    uint32_t r_extern:1;
+#    uint32_t r_type:4;
+#};
+
+# notes:
+# https://awesomeopensource.com/project/aidansteele/osx-abi-macho-file-format-reference
+# llvm-readobj -r ~/Desktop/fakeintrinsics_bn_64.o -r --expand-relocs
+
+def tag_relocation_info(fp, cputype, comment=''):
+    base = fp.tell()
+
+    # peek at r_address, determine entire structure size
+    r_address = uint32(fp, 1)
+    if r_address & R_SCATTERED:
+        tag(fp, 4+4, 'struct scattered_relocation_info%s' % comment, 1)
+    else:
+        tag(fp, 4+4, 'struct relocation_info%s' % comment, 1)
+    fp.seek(base)
+    tag(fp, 4, 'r_address: 0x%X' % r_address)
+
+    tmp = uint32(fp, 1)
+    r_symbolnum = tmp & 0xFFFFFF
+    r_pcrel = (tmp >> 24) & 1
+    r_length = (tmp >> 25) & 2
+    r_extern = (tmp >> 27) & 1
+    r_type = (tmp >> 28) & 0xF
+
+    r_type_str = ''
+    if cputype == CPU_TYPE_ARM64:
+        r_type_str = RELOC_TYPE_ARM64(r_type).name
+
+    descr = []
+    if r_extern == 1:
+        descr.append('r_symbolnum: 0x%X (symbol table index)' % r_symbolnum)
+    else:
+        descr.append('r_symbolnum: 0x%X (section number [1,255])' % r_symbolnum)
+    descr.append('r_pcrel: %d' % r_pcrel)
+    descr.append('r_length: %s bytes (%d)' % (2**r_length, r_length))
+    descr.append('r_extern: %d' % r_extern)
+    descr.append('r_type: %s (%d)' % (r_type_str, r_extern))
+
+    tag(fp, 4, '\\n'.join(descr))
+    return 8
 
 ###############################################################################
 # "main"
@@ -212,7 +363,7 @@ def analyze(fp):
     magic = uint32(fp, True)
     tag(fp, 4, "magic=%08X (%s)" % (magic, lookup_magic[magic]))
     cputype = uint32(fp, True)
-    tag(fp, 4, "cputype=%08X (%s)" % (cputype, lookup_cputype[cputype]))
+    tag(fp, 4, "cputype=%08X (%s)" % (cputype, lookup_cputype.get(cputype)))
     a = uint32(fp, True)
     subtype = a & 0xFF
     capabilities = a & CPU_SUBTYPE_MASK
@@ -255,16 +406,23 @@ def analyze(fp):
                 segname = tagString(fp, 16, "segname")
                 tagUint64(fp, "addr")
                 tagUint64(fp, "size")
-                tagUint32(fp, "offset")
+                offset = offset = tagUint32(fp, "offset")
                 tagUint32(fp, "align")
-                tagUint32(fp, "reloff")
-                tagUint32(fp, "nreloc")
+                reloff = tagUint32(fp, "reloff")
+                nreloc = tagUint32(fp, "nreloc")
                 tagUint32(fp, "flags")
                 tagUint32(fp, "reserved1")
                 tagUint32(fp, "reserved2")
                 tagUint32(fp, "reserved3")
                 print('[0x%X,0x%X) section_64 \"%s\" %d/%d' % \
                     (oScn, fp.tell(), sectname, j+1, nsects))
+
+                # if this section has relocations, parse them
+                anchor = fp.tell()
+                fp.seek(reloff)
+                for i in range(nreloc):
+                    tag_relocation_info(fp, cputype, ' (section %s)' % sectname)
+                fp.seek(anchor)
 
             print('[0x%X,0x%X) segment_command_64 \"%s\"' % \
                 (oCmd, fp.tell(), segname))
