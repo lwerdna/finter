@@ -4,8 +4,11 @@
 # source:
 #   /usr/include/mach-o/loader.h and others
 #   <llvm>/include/llvm/Support/MachO.h
+#   https://awesomeopensource.com/project/aidansteele/osx-abi-macho-file-format-reference
 # programs:
 #   otool -fahl <file>
+#   llvm-readobj --symbols ~/Desktop/fakeintrinsics_bn_64.o
+#   llvm-readobj -r ~/Desktop/fakeintrinsics_bn_64.o -r --expand-relocs
 
 import sys
 import binascii
@@ -14,6 +17,13 @@ from struct import unpack
 from enum import Enum
 
 from .helpers import *
+
+# globals
+# while parsing load commands segment64, save these areas to parse relocations
+section_reloc_areas = [] # (<offset>, <num_relocs>, <section_name>)
+# while parsing load command symtab
+(symtab_offset, symtab_amount, symtab_strtab_offset) = (0, 0, 0)
+symtab_strings = []
 
 MH_MAGIC = 0xFEEDFACE
 MH_CIGAM = 0xCEFAEDFE
@@ -184,6 +194,79 @@ class LOAD_COMMAND_TYPE(Enum):
     LC_NOTE = 0x31
     LC_BUILD_VERSION = 0x32
 
+#------------------------------------------------------------------------------
+# symbol table types, helpers
+#------------------------------------------------------------------------------
+
+def string_abduct(fp, offset):
+    anchor = fp.tell()
+    fp.seek(offset)
+    tmp = string_null(fp)
+    fp.seek(anchor)
+    return tmp
+
+# struct nlist[_64] {
+#   uint32_t n_strx;
+#   uint8_t n_type;
+#   uint8_t n_sect;
+#   int16_t n_desc;
+#   uint[32|64]_t n_value;
+# };
+def tag_nlist(fp, cputype, stroff):
+    # whole struct
+    if cputype & CPU_ARCH_ABI64:
+        tag(fp, 16, 'nlist_64', 1)
+    else:
+        tag(fp, 12, 'nlist', 1)
+
+    # .n_strx
+    n_strx = uint32(fp, 1)
+    sym_name = string_abduct(fp, stroff + n_strx) if n_strx else ''
+    tag(fp, 4, 'n_strx: 0x%x "%s"' % (n_strx, sym_name))
+
+    # .n_type has 4 subfields
+    n_type = uint8(fp, 1)
+    n_stab = (n_type & 0xe0) >> 5
+    n_pext = (n_type & 0x10) >> 4
+    n_type = (n_type & 0xe) >> 1
+    n_ext = n_type & 1
+    descr = []
+    descr.append('n_type')
+    descr.append('  N_STAB: %s' % bin(n_stab))
+    descr.append('  N_PEXT: %s' % bin(n_pext))
+    if n_type == 0:
+        descr.append('  N_TYPE: N_UNDF (0)')
+    elif n_type == 2:
+        descr.append('  N_TYPE: N_ABS (2)')
+    elif n_type == 0xe:
+        descr.append('  N_TYPE: N_SECT (0xe)')
+    elif n_type == 0xc:
+        descr.append('  N_TYPE: N_PBUD (0xc)')
+    elif n_type == 0xa:
+        descr.append('  N_TYPE: N_INDR (0xa)')
+    else:
+        descr.append('  N_TYPE: 0x%x' % n_type)
+    descr.append('  N_EXT: %s' % bin(n_ext))
+    tag(fp, 1, '\\n'.join(descr))
+
+    # .n_sect
+    tagUint8(fp, 'n_sect')
+
+    # .n_desc
+    tagUint16(fp, 'n_desc')
+
+    # .n_value
+    if cputype & CPU_ARCH_ABI64:
+        tagUint64(fp, 'n_value')
+    else:
+        tagUint32(fp, 'n_value')
+
+    return sym_name
+
+#------------------------------------------------------------------------------
+# relocation types, helpers
+#------------------------------------------------------------------------------
+
 class RELOC_TYPE_GENERIC(Enum):
     # Constant values for the r_type field in an
     # llvm::MachO::relocation_info or llvm::MachO::scattered_relocation_info
@@ -290,11 +373,7 @@ R_SCATTERED = 0x80000000
 #    uint32_t r_type:4;
 #};
 
-# notes:
-# https://awesomeopensource.com/project/aidansteele/osx-abi-macho-file-format-reference
-# llvm-readobj -r ~/Desktop/fakeintrinsics_bn_64.o -r --expand-relocs
-
-def tag_relocation_info(fp, cputype, comment=''):
+def tag_relocation_info(fp, cputype, sym_table_names, comment=''):
     base = fp.tell()
 
     # peek at r_address, determine entire structure size
@@ -320,6 +399,8 @@ def tag_relocation_info(fp, cputype, comment=''):
     descr = []
     if r_extern == 1:
         descr.append('r_symbolnum: 0x%X (symbol table index)' % r_symbolnum)
+        if r_symbolnum < len(symtab_strings):
+            descr[-1] = 'r_symbolnum: 0x%X "%s"' % (r_symbolnum, symtab_strings[r_symbolnum])
     else:
         descr.append('r_symbolnum: 0x%X (section number [1,255])' % r_symbolnum)
     descr.append('r_pcrel: %d' % r_pcrel)
@@ -330,9 +411,9 @@ def tag_relocation_info(fp, cputype, comment=''):
     tag(fp, 4, '\\n'.join(descr))
     return 8
 
-###############################################################################
+#------------------------------------------------------------------------------
 # "main"
-###############################################################################
+#------------------------------------------------------------------------------
 
 (is32,is64) = (False, False)
 
@@ -382,6 +463,7 @@ def analyze(fp):
     if is64:
         tagUint32(fp, "reserved")
 
+    # parse commands
     for i in range(ncmds):
         oCmd = fp.tell()
         cmd = tagUint32(fp, "cmd")
@@ -417,12 +499,8 @@ def analyze(fp):
                 print('[0x%X,0x%X) section_64 \"%s\" %d/%d' % \
                     (oScn, fp.tell(), sectname, j+1, nsects))
 
-                # if this section has relocations, parse them
-                anchor = fp.tell()
-                fp.seek(reloff)
-                for i in range(nreloc):
-                    tag_relocation_info(fp, cputype, ' (section %s)' % sectname)
-                fp.seek(anchor)
+                # save reloc reference for later parsing
+                section_reloc_areas.append((reloff, nreloc, sectname))
 
             print('[0x%X,0x%X) segment_command_64 \"%s\"' % \
                 (oCmd, fp.tell(), segname))
@@ -469,12 +547,14 @@ def analyze(fp):
                 (oCmd, fp.tell()))
 
         elif cmd == LOAD_COMMAND_TYPE.LC_SYMTAB:
-            tagUint32(fp, "symoff")
-            tagUint32(fp, "nsyms")
-            tagUint32(fp, "stroff")
+            symoff = tagUint32(fp, "symoff")
+            nsyms = tagUint32(fp, "nsyms")
+            stroff = tagUint32(fp, "stroff")
             tagUint32(fp, "strsize")
             print('[0x%X,0x%X) symtab_command' % \
                 (oCmd, fp.tell()))
+
+            (symtab_offset, symtab_amount, symtab_strtab_offset) = (symoff, nsyms, stroff)
 
         elif cmd == LOAD_COMMAND_TYPE.LC_UUID:
             uuid = tag(fp, 16, "uuid")
@@ -557,6 +637,23 @@ def analyze(fp):
             print('[0x%X,0x%X) command %s' % \
                 (oCmd, oCmd+cmdSize, LOAD_COMMAND_TYPE(cmd).name))
             tag(fp, cmdSize-8, 'data')
+
+    # post-command parsing
+
+    # parse symbol table
+    if symtab_offset:
+        fp.seek(symtab_offset)
+        for i in range(symtab_amount):
+            sym_name = tag_nlist(fp, cputype, symtab_strtab_offset)
+            symtab_strings.append(sym_name)
+
+    # parse relocation areas referenced by sections
+    for (reloff, nreloc, sectname) in section_reloc_areas:
+        anchor = fp.tell()
+        fp.seek(reloff)
+        for i in range(nreloc):
+            tag_relocation_info(fp, cputype, [], ' (section %s)' % sectname)
+        fp.seek(anchor)
 
 if __name__ == '__main__':
     with open(sys.argv[1], 'rb') as fp:
