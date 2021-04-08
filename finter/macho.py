@@ -264,6 +264,17 @@ class LOAD_COMMAND_TYPE(Enum):
     LC_NOTE = 0x31
     LC_BUILD_VERSION = 0x32
 
+# .initprop property of segment command
+VM_PROT_READ = 1
+VM_PROT_WRITE = 2
+VM_PROT_EXECUTE = 4
+def vm_prot_str(x):
+    result = []
+    if x & VM_PROT_READ: result.append('R')
+    if x & VM_PROT_WRITE: result.append('W')
+    if x & VM_PROT_EXECUTE: result.append('X')
+    return '|'.join(result)
+
 #------------------------------------------------------------------------------
 # symbol table types, helpers
 #------------------------------------------------------------------------------
@@ -556,7 +567,9 @@ def analyze(fp):
             tagUint64(fp, "fileoff")
             tagUint64(fp, "filesize")
             tagUint32(fp, "maxprot")
-            tagUint32(fp, "initprot")
+            initprot = uint32(fp, "initprot")
+            tag(fp, 4, 'initprot=0x%X %s' % (initprot, vm_prot_str(initprot)))
+
             nsects = tagUint32(fp, "nsects")
             flags = tagUint32(fp, "flags")
 
