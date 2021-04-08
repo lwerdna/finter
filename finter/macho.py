@@ -140,6 +140,75 @@ MH_HAS_TLV_DESCRIPTORS = 0x00800000
 MH_NO_HEAP_EXECUTION = 0x01000000
 MH_APP_EXTENSION_SAFE = 0x02000000
 
+# masks for section/section64 .flags property
+SCN_TYPE_MASK           = 0x000000ff
+SCN_ATTRIBUTES_USR_MASK = 0xff000000
+SCN_ATTRIBUTES_SYS_MASK = 0x00ffff00
+SCN_ATTRIBUTES_MASK     = (SCN_ATTRIBUTES_USR_MASK | SCN_ATTRIBUTES_SYS_MASK)
+
+# values for section .flags & SECTION_TYPE
+class SECTION_TYPE(Enum):
+    S_REGULAR = 0x00
+    S_ZEROFILL = 0x01
+    S_CSTRING_LITERALS = 0x02
+    S_4BYTE_LITERALS = 0x03
+    S_8BYTE_LITERALS = 0x04
+    S_LITERAL_POINTERS = 0x05
+    S_NON_LAZY_SYMBOL_POINTERS = 0x06
+    S_LAZY_SYMBOL_POINTERS = 0x07
+    S_SYMBOL_STUBS = 0x08
+    S_MOD_INIT_FUNC_POINTERS = 0x09
+    S_MOD_TERM_FUNC_POINTERS = 0x0a
+    S_COALESCED = 0x0b
+    S_GB_ZEROFILL = 0x0c
+    S_INTERPOSING = 0x0d
+    S_16BYTE_LITERALS = 0x0e
+    S_DTRACE_DOF = 0x0f
+    S_LAZY_DYLIB_SYMBOL_POINTERS = 0x10
+    S_THREAD_LOCAL_REGULAR = 0x11
+    S_THREAD_LOCAL_ZEROFILL = 0x12
+    S_THREAD_LOCAL_VARIABLES = 0x13
+    S_THREAD_LOCAL_VARIABLE_POINTERS = 0x14
+    S_THREAD_LOCAL_INIT_FUNCTION_POINTERS = 0x15
+
+def section_type_str(x):
+    try:
+        return SECTION_TYPE(x & SCN_TYPE_MASK).name
+    except ValueError:
+        return 'UNKNOWN'
+
+# values for section .flags & SECTION_ATTRIBUTES_USR
+S_ATTR_PURE_INSTRUCTIONS = 0x80000000
+S_ATTR_NO_TOC = 0x40000000
+S_ATTR_STRIP_STATIC_SYMS = 0x20000000
+S_ATTR_NO_DEAD_STRIP = 0x10000000
+S_ATTR_LIVE_SUPPORT = 0x08000000
+S_ATTR_SELF_MODIFYING_CODE = 0x04000000
+S_ATTR_DEBUG = 0x02000000
+
+# values for section .flags & SECTION_ATTRIBUTES_SYS
+S_ATTR_SOME_INSTRUCTIONS = 0x00000400
+S_ATTR_EXT_RELOC = 0x00000200
+S_ATTR_LOC_RELOC = 0x00000100
+
+def section_attrs_str(x):
+    result = []
+    usr = x & SCN_ATTRIBUTES_USR_MASK
+    if usr & S_ATTR_PURE_INSTRUCTIONS: result.append('PURE_INSTRUCTIONS')
+    if usr & S_ATTR_NO_TOC: result.append('S_ATTR_NO_TOC')
+    if usr & S_ATTR_STRIP_STATIC_SYMS: result.append('S_ATTR_STRIP_STATIC_SYMS')
+    if usr & S_ATTR_NO_DEAD_STRIP: result.append('S_ATTR_NO_DEAD_STRIP')
+    if usr & S_ATTR_LIVE_SUPPORT: result.append('S_ATTR_LIVE_SUPPORT')
+    if usr & S_ATTR_SELF_MODIFYING_CODE: result.append('S_ATTR_SELF_MODIFYING_CODE')
+    if usr & S_ATTR_DEBUG: result.append('S_ATTR_DEBUG')
+
+    sys = x & SCN_ATTRIBUTES_SYS_MASK
+    if sys & S_ATTR_SOME_INSTRUCTIONS: result.append('S_ATTR_SOME_INSTRUCTIONS')
+    if sys & S_ATTR_EXT_RELOC: result.append('S_ATTR_EXT_RELOC')
+    if sys & S_ATTR_LOC_RELOC: result.append('S_ATTR_LOC_RELOC')
+
+    return '|'.join(result)
+
 # Constants for the cmd field of all load commands, the type
 class LOAD_COMMAND_TYPE(Enum):
     LC_REQ_DYLD = 0x80000000
@@ -386,9 +455,9 @@ def tag_relocation_info(fp, cputype, sym_table_names, comment=''):
     fp.seek(base)
     tag(fp, 4, 'r_address: 0x%X' % r_address)
     # r_address:
-	# in MH_OBJECT files, this is an offset from the start of the section to the item containing the address requiring relocation.
-	# in images used by the dynamic linker, this is an offset from the virtual memory address of the data of the first segment_command that appears in the file (not necessarily the one with the lowest address).
-	# in images with the MH_SPLIT_SEGS flag set, this is an offset from the virtual memory address of data of the first read/write segment_command.
+    # in MH_OBJECT files, this is an offset from the start of the section to the item containing the address requiring relocation.
+    # in images used by the dynamic linker, this is an offset from the virtual memory address of the data of the first segment_command that appears in the file (not necessarily the one with the lowest address).
+    # in images with the MH_SPLIT_SEGS flag set, this is an offset from the virtual memory address of data of the first read/write segment_command.
 
     tmp = uint32(fp, 1)
     r_symbolnum = tmp & 0xFFFFFF
@@ -501,7 +570,9 @@ def analyze(fp):
                 tagUint32(fp, "align")
                 reloff = tagUint32(fp, "reloff")
                 nreloc = tagUint32(fp, "nreloc")
-                tagUint32(fp, "flags")
+                flags = uint32(fp, 1)
+                tag(fp, 4, "flags=0x%X\\n  type: %s\\n  attrs: %s" % \
+                    (flags, section_type_str(flags), section_attrs_str(flags)))
                 tagUint32(fp, "reserved1")
                 tagUint32(fp, "reserved2")
                 tagUint32(fp, "reserved3")
