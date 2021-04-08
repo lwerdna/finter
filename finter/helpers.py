@@ -227,7 +227,7 @@ def string_null(FP, peek=0):
 	while not buf.endswith(b'\x00'):
 		buf += FP.read(1)
 	if peek: FP.seek(-1*len(buf), 1)
-	return buf.decode('utf-8')
+	return buf[0:-1].decode('utf-8')
 #
 def dataUntil(FP, terminator, peek=0):
     data = b''

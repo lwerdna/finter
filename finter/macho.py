@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # references (if you have it):
-# source:
+# sources:
 #   /usr/include/mach-o/loader.h and others
 #   <llvm>/include/llvm/Support/MachO.h
 #   https://awesomeopensource.com/project/aidansteele/osx-abi-macho-file-format-reference
@@ -20,10 +20,11 @@ from .helpers import *
 
 # globals
 # while parsing load commands segment64, save these areas to parse relocations
-section_reloc_areas = [] # (<offset>, <num_relocs>, <section_name>)
+reloc_areas = [] # (<offset>, <num_relocs>, <info>)
 # while parsing load command symtab
 (symtab_offset, symtab_amount, symtab_strtab_offset) = (0, 0, 0)
 symtab_strings = []
+section_strings = [''] # 1-indexed in macho, given as "<SEGNAME>/<SECNAME> like __TEXT/__stubs"
 
 MH_MAGIC = 0xFEEDFACE
 MH_CIGAM = 0xCEFAEDFE
@@ -384,6 +385,10 @@ def tag_relocation_info(fp, cputype, sym_table_names, comment=''):
         tag(fp, 4+4, 'struct relocation_info%s' % comment, 1)
     fp.seek(base)
     tag(fp, 4, 'r_address: 0x%X' % r_address)
+    # r_address:
+	# in MH_OBJECT files, this is an offset from the start of the section to the item containing the address requiring relocation.
+	# in images used by the dynamic linker, this is an offset from the virtual memory address of the data of the first segment_command that appears in the file (not necessarily the one with the lowest address).
+	# in images with the MH_SPLIT_SEGS flag set, this is an offset from the virtual memory address of data of the first read/write segment_command.
 
     tmp = uint32(fp, 1)
     r_symbolnum = tmp & 0xFFFFFF
@@ -395,6 +400,8 @@ def tag_relocation_info(fp, cputype, sym_table_names, comment=''):
     r_type_str = ''
     if cputype == CPU_TYPE_ARM64:
         r_type_str = RELOC_TYPE_ARM64(r_type).name
+    elif cputype == CPU_TYPE_X86_64:
+        r_type_str = RELOC_TYPE_X86_64(r_type).name
 
     descr = []
     if r_extern == 1:
@@ -403,6 +410,8 @@ def tag_relocation_info(fp, cputype, sym_table_names, comment=''):
             descr[-1] = 'r_symbolnum: 0x%X "%s"' % (r_symbolnum, symtab_strings[r_symbolnum])
     else:
         descr.append('r_symbolnum: 0x%X (section number [1,255])' % r_symbolnum)
+        if r_symbolnum < len(section_strings):
+            descr[-1] = 'r_symbolnum: 0x%X section "%s"' % (r_symbolnum, section_strings[r_symbolnum])
     descr.append('r_pcrel: %d' % r_pcrel)
     descr.append('r_length: %s bytes (%d)' % (2**r_length, r_length))
     descr.append('r_extern: %d' % r_extern)
@@ -487,8 +496,8 @@ def analyze(fp):
                 sectname = tagString(fp, 16, "sectname")
                 segname = tagString(fp, 16, "segname")
                 tagUint64(fp, "addr")
-                tagUint64(fp, "size")
-                offset = offset = tagUint32(fp, "offset")
+                size = tagUint64(fp, "size")
+                offset = tagUint32(fp, "offset")
                 tagUint32(fp, "align")
                 reloff = tagUint32(fp, "reloff")
                 nreloc = tagUint32(fp, "nreloc")
@@ -499,8 +508,15 @@ def analyze(fp):
                 print('[0x%X,0x%X) section_64 \"%s\" %d/%d' % \
                     (oScn, fp.tell(), sectname, j+1, nsects))
 
+                # tag section body
+                print('[0x%X,0x%X) section %s/%s contents' % \
+                    (offset, offset+size, segname, sectname))
+
+                # save section name
+                section_strings.append('%s/%s' % (segname, sectname))
+
                 # save reloc reference for later parsing
-                section_reloc_areas.append((reloff, nreloc, sectname))
+                reloc_areas.append((reloff, nreloc, '(section %s)' % sectname))
 
             print('[0x%X,0x%X) segment_command_64 \"%s\"' % \
                 (oCmd, fp.tell(), segname))
@@ -628,11 +644,13 @@ def analyze(fp):
             tagUint32(fp, "nindirectsyms")
             tagUint32(fp, "extreloff")
             tagUint32(fp, "nextrel")
-            tagUint32(fp, "locreloff")
-            tagUint32(fp, "nlocrel")
+            locreloff = tagUint32(fp, "locreloff")
+            nlocrel = tagUint32(fp, "nlocrel")
             print('[0x%X,0x%X) dysymtab_command' % \
                 (oCmd, fp.tell()))
 
+            if locreloff and nlocrel:
+                reloc_areas.append((locreloff, nlocrel, '(dysymtab)'))
         else:
             print('[0x%X,0x%X) command %s' % \
                 (oCmd, oCmd+cmdSize, LOAD_COMMAND_TYPE(cmd).name))
@@ -648,11 +666,11 @@ def analyze(fp):
             symtab_strings.append(sym_name)
 
     # parse relocation areas referenced by sections
-    for (reloff, nreloc, sectname) in section_reloc_areas:
+    for (reloff, nreloc, info) in reloc_areas:
         anchor = fp.tell()
         fp.seek(reloff)
         for i in range(nreloc):
-            tag_relocation_info(fp, cputype, [], ' (section %s)' % sectname)
+            tag_relocation_info(fp, cputype, [], info)
         fp.seek(anchor)
 
 if __name__ == '__main__':
