@@ -1,9 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # display given file as offset, hex, ascii (OHA)
 
 import re
-import io
 import sys
 from intervaltree import Interval, IntervalTree
 from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy
@@ -28,6 +27,7 @@ class OhaNode():
 
     def pprint(self, depth=0):
         truncate = False
+        truncate = True
         addr = self.interval.begin
         comment = '  '*depth + self.interval.data
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         print('ERROR: missing file parameter')
         print('usage: %s <file>' % sys.argv[0])
         sys.exit(-1)
-    
+
     fpath = sys.argv[1]
 
     interval_tree = dissect_file(fpath)
@@ -116,4 +116,4 @@ if __name__ == '__main__':
         root.setfp(fp)
         for ch in sorted_children:
             ch.pprint()
-    
+

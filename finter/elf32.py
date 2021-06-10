@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import struct
@@ -7,10 +7,54 @@ import binascii
 from .elf import *
 from .helpers import *
 
+#typedef struct {
+#        Elf32_Addr      r_offset;
+#        Elf32_Word      r_info;
+#} Elf32_Rel;
+def tag_elf32_rel(fp, machine:E_MACHINE=None):
+    tag(fp, 8, 'Elf32_Rel', 1)
+
+    #r_offset = uint32(fp, 1)
+    tagUint32(fp, 'r_offset') # location relocation is applied
+                           # - relocated file: section offset
+                           # - executable/shared object: virtual address
+    r_info = uint32(fp, 1)
+    r_sym = ELF32_R_SYM(r_info)
+    r_type = ELF32_R_TYPE(r_info)
+    r_type_str = ''
+    if machine == E_MACHINE.EM_ARM.value:
+        r_type_str = ' %s' % RELOC_TYPE_ARM(r_type).name
+    descr = 'r_info=%08X (sym=%06X type=%02X%s)' % \
+        (r_info, r_sym, r_type, r_type_str)
+    tag(fp, 4, descr)   # relocation type and symbol table index
+                           # - eg: R_SPARC_GOT10, R_386_PLT32, R_AMD64_JUMP_SLOT
+
+#typedef struct {
+#        Elf32_Addr      r_offset;
+#        Elf32_Word      r_info;
+#        Elf32_Sword     r_addend;
+#} Elf32_Rela;
+def tag_elf32_rela(fp):
+    tag(fp, 12, 'Elf32_Rela', 1)
+    tag(fp, 4, 'r_offset')
+    tag(fp, 4, 'r_info')
+    tag(fp, 4, 'r_addend')
+
+# get symbol table index from r_info
+#define ELF32_R_SYM(info)             ((info)>>8)
+def ELF32_R_SYM(info):
+    return (info >> 8) & 0xFFFFFF
+
+# get symbol type from r_info
+#define ELF32_R_TYPE(info)            ((unsigned char)(info))
+def ELF32_R_TYPE(info):
+    return info & 0xFF
+
 def analyze(fp):
     if not isElf32(fp):
            return
 
+    # read elf32_hdr
     tag(fp, SIZE_ELF32_HDR, "elf32_hdr", 1)
     tag(fp, 4, "e_ident[0..4)")
     tagUint8(fp, "e_ident[EI_CLASS] (32-bit)")
@@ -57,7 +101,8 @@ def analyze(fp):
     dynamic = None
     symtab = None
     strtab = None
-    relText = None
+    reloc_sections = [] # [(offset, size)]
+    reloca_sections = []
     fp.seek(e_shoff)
     for i in range(e_shnum):
         oHdr = fp.tell()
@@ -86,8 +131,10 @@ def analyze(fp):
             symtab = [sh_offset, sh_size]
         if strName == '.strtab':
             strtab = [sh_offset, sh_size]
-        if strName == '.rel.text':
-            relText = [sh_offset, sh_size]
+        if sh_type == SHT_REL:
+            reloc_sections.append((sh_offset, sh_size))
+        if sh_type == SHT_RELA:
+            reloca_sections.append((sh_offset, sh_size))
 
         print('[0x%X,0x%X) elf32_shdr "%s" %s (index: %d)' % \
             (oHdr, fp.tell(), scnStrTab[sh_name], strType, i))
@@ -103,15 +150,15 @@ def analyze(fp):
         fp.seek(offs)
         strTab = StringTable(fp, size)
 
-    if relText:
-        [offs,size] = relText
+    for (offs, size) in reloc_sections:
         fp.seek(offs)
-        remainder = size
-        while remainder:
-            tag(fp, 8, "Elf32_Rel", True)
-            tagUint32(fp, "d_val")
-            tagUint32(fp, "d_ptr")
-            remainder -= 8
+        while fp.tell() < offs + size:
+            tag_elf32_rel(fp, e_machine)
+
+    for (offs, size) in reloca_sections:
+        fp.seek(offs)
+        while fp.tell() < offs + size:
+            tag_elf32_rela(fp, e_machine)
 
     if dynamic:
         # .dynamic is just an array of Elf32_Dyn entries

@@ -36,7 +36,7 @@ def adjHue(color, addend):
     h = min(1, h+addend)
     [r,g,b] = map(lambda x: int(x*255), colorsys.hsv_to_rgb(h,s,v))
     return rgbComp(r,g,b)
-    
+
 def colorFromBytes(data):
     color_lookup = [ \
         0x772277, 0x752277, 0x732277, 0x722378, 0x702378, 0x6F2378, 0x6D2479, 0x6B2479, \
@@ -76,7 +76,7 @@ def colorFromBytes(data):
     avg = int(round(sum(map(ord, list(data))) / len(data)))
     assert avg >= 0 and avg <= 255
     return color_lookup[avg]
-        
+
 def colorFromBytesFP(FP, length, rewind=0):
     tmp = FP.tell()
     result = colorFromBytes(FP.read(length));
@@ -208,10 +208,10 @@ def uleb128(FP, peek=0):
         value = value | ((t & 0x7F)<<(7*nbytes))
         nbytes += 1
 
-        if not (t & 0x80): 
+        if not (t & 0x80):
             break
 
-    if peek: 
+    if peek:
         FP.seek(anchor)
 
     return (value, nbytes)
