@@ -27,7 +27,7 @@ class OhaNode():
 
     def pprint(self, depth=0):
         truncate = False
-        truncate = True
+        #truncate = True
         addr = self.interval.begin
         comment = '  '*depth + self.interval.data
 

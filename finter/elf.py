@@ -581,6 +581,21 @@ class RELOC_TYPE_ARM(Enum):
     R_ARM_THM_TLS_DESCSEQ32 = 130
 
 ###############################################################################
+# taggers common to elf32/elf64
+###############################################################################
+def tag_strtab(fp, size):
+    base = fp.tell()
+    buf = fp.read(size)
+    starts = [i for i in range(1,size) if buf[i]!=0 and buf[i-1]==0]
+    lengths = [starts[i+1]-starts[i] for i in range(len(starts)-1)] + [size-starts[-1]]
+    for (i, start) in enumerate(starts):
+        length = lengths[i]
+        fp.seek(base + start)
+        tagString(fp, length, '%d/%d' % (i+1, len(starts)))
+    fp.seek(base)
+    #tag(fp, size, 'strtab')
+
+###############################################################################
 # helper classes
 ###############################################################################
 class StringTable:
