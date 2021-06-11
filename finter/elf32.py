@@ -50,7 +50,7 @@ def ELF32_R_SYM(info):
 def ELF32_R_TYPE(info):
     return info & 0xFF
 
-def tag_elf32_sym(fp, strTab:StringTable):
+def tag_elf32_sym(fp, index, strTab:StringTable):
     tmp = fp.tell()
 
     st_name = uint32(fp, 1)
@@ -71,7 +71,7 @@ def tag_elf32_sym(fp, strTab:StringTable):
 
     st_shndx = tagUint16(fp, "st_shndx")
     fp.seek(tmp)
-    tag(fp, SIZE_ELF32_SYM, "Elf32_Sym \"%s\"" % nameStr)
+    tag(fp, SIZE_ELF32_SYM, "Elf32_Sym \"%s\" (index:%d)" % (nameStr, index))
 
 def tag_elf32_dyn(fp):
     tmp = fp.tell()
@@ -84,6 +84,39 @@ def tag_elf32_dyn(fp):
 
     if d_tag == DT_NULL:
         return 'quit'
+
+def tag_elf32_shdr(fp, index, scnStrTab):
+    base = fp.tell()
+
+    sh_name = tagUint32(fp, "sh_name")
+    sh_type = uint32(fp, 1)
+    tag(fp, 4, "sh_type=0x%X (%s)" % \
+        (sh_type, sh_type_tostr(sh_type)))
+    sh_flags = uint32(fp, 1)
+    tag(fp, 4, "sh_flags=0x%X (%s)" % \
+        (sh_flags, sh_flags_tostr(sh_flags)))
+    sh_addr = tagUint32(fp, "sh_addr")
+    sh_offset = tagUint32(fp, "sh_offset")
+    sh_size = tagUint32(fp, "sh_size")
+    sh_link = tagUint32(fp, "sh_link") # usually the section index of the associated string or symbol table
+    sh_info = tagUint32(fp, "sh_info") # usually the section index of the section to which this applies
+    sh_addralign = tagUint32(fp, "sh_addralign")
+    sh_entsize = tagUint32(fp, "sh_entsize")
+
+    fp.seek(base)
+    tag(fp, 40, 'elf32_shdr "%s" %s (index: %d)' % \
+        (scnStrTab[sh_name], sh_type_tostr(sh_type), index))
+
+    return {'sh_name':sh_name,
+            'sh_type':sh_type,
+            'sh_flags':sh_flags,
+            'sh_addr':sh_addr,
+            'sh_offset':sh_offset,
+            'sh_size':sh_size,
+            'sh_link':sh_link,
+            'sh_info':sh_info,
+            'sh_addralign':sh_addralign,
+            'sh_entsize':sh_entsize}
 
 def analyze(fp):
     if not isElf32(fp):
@@ -132,81 +165,54 @@ def analyze(fp):
     fp.seek(sh_offset)
     scnStrTab = StringTable(fp, sh_size)
 
-    # read all section headers
-    dynamic = None
-    symtab = None
-    reloc_sections = [] # [(offset, size)]
-    reloca_sections = []
-    strtab_sections = []
+    # tag and save all section headers
     fp.seek(e_shoff)
+    scn_infos = []
     for i in range(e_shnum):
-        oHdr = fp.tell()
-        sh_name = tagUint32(fp, "sh_name")
-        sh_type = uint32(fp, 1)
-        tag(fp, 4, "sh_type=0x%X (%s)" % \
-            (sh_type, sh_type_tostr(sh_type)))
-        sh_flags = uint32(fp, 1)
-        tag(fp, 4, "sh_flags=0x%X (%s)" % \
-            (sh_flags, sh_flags_tostr(sh_flags)))
-        tagUint32(fp, "sh_addr")
-        sh_offset = tagUint32(fp, "sh_offset")
-        sh_size = tagUint32(fp, "sh_size")
-        tagUint32(fp, "sh_link") # usually the section index of the associated string or symbol table
-        tagUint32(fp, "sh_info") # usually the section index of the section to which this applies
-        tagUint32(fp, "sh_addralign")
-        tagUint32(fp, "sh_entsize")
+        info:dict = tag_elf32_shdr(fp, i, scnStrTab)
+        scn_infos.append(info)
 
-        strType = sh_type_tostr(sh_type)
-        strName = scnStrTab[sh_name]
-
-        # store info on special sections
-        if strName == '.dynamic':
-            dynamic = [sh_offset, sh_size]
-        if strName == '.symtab':
-            symtab = [sh_offset, sh_size]
-        if sh_type == SHT_STRTAB:
-            strtab_sections.append((sh_offset, sh_size))
-        if sh_type == SHT_REL:
-            reloc_sections.append((sh_offset, sh_size))
-        if sh_type == SHT_RELA:
-            reloca_sections.append((sh_offset, sh_size))
-
-        print('[0x%X,0x%X) elf32_shdr "%s" %s (index: %d)' % \
-            (oHdr, fp.tell(), scnStrTab[sh_name], strType, i))
-
-        if not sh_type in [SHT_NULL, SHT_NOBITS] and sh_size > 0:
+    # tag section contents
+    for (i,info) in enumerate(scn_infos):
+        # top level container
+        if not info['sh_type'] in [SHT_NULL, SHT_NOBITS] and info['sh_size'] > 0:
             print('[0x%X,0x%X) section "%s" contents' % \
-                (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
+                (info['sh_offset'], info['sh_offset']+info['sh_size'], scnStrTab[info['sh_name']]))
 
-    # certain sections we analyze deeper...
-    for (offs, size) in strtab_sections:
-        fp.seek(offs)
-        tag_strtab(fp, size)
+        # like .dynamic
+        if info['sh_type'] == SHT_DYNAMIC:
+            # array of Elf32_Dyn entries
+            fp.seek(info['sh_offset'])
+            while fp.tell() < (info['sh_offset'] + info['sh_size']):
+                if tag_elf32_dyn(fp) == 'quit':
+                    break
 
-    for (offs, size) in reloc_sections:
-        fp.seek(offs)
-        while fp.tell() < offs + size:
-            tag_elf32_rel(fp, e_machine)
+        # like .dynsym
+        elif info['sh_type'] in [SHT_SYMTAB, SHT_DYNSYM]:
+            # get associated string table
+            link = info['sh_link']
+            fp.seek(scn_infos[link]['sh_offset'])
+            strtab = StringTable(fp, scn_infos[link]['sh_size'])
+            # array of Elf32_Sym entries
+            idx = 0
+            fp.seek(info['sh_offset'])
+            while fp.tell() < (info['sh_offset'] + info['sh_size']):
+                tag_elf32_sym(fp, idx, strtab)
+                idx += 1
 
-    for (offs, size) in reloca_sections:
-        fp.seek(offs)
-        while fp.tell() < offs + size:
-            tag_elf32_rela(fp, e_machine)
+        elif info['sh_type'] == SHT_STRTAB:
+            fp.seek(info['sh_offset'])
+            tag_strtab(fp, info['sh_size'])
 
-    if dynamic:
-        # .dynamic is just an array of Elf32_Dyn entries
-        [offs,size] = dynamic
-        fp.seek(offs)
-        while fp.tell() < (offs + size):
-            if tag_elf32_dyn(fp) == 'quit':
-                break
+        elif info['sh_type'] == SHT_REL:
+            fp.seek(info['sh_offset'])
+            while fp.tell() < (info['sh_offset'] + info['sh_size']):
+                tag_elf32_rel(fp, e_machine)
 
-    if symtab and strTab:
-        # .symbtab is an array of Elf32_Sym entries
-        [offs, size] = symtab
-        fp.seek(offs)
-        while fp.tell() < (offs + size):
-            tag_elf32_sym(fp, strTab)
+        elif info['sh_type'] == SHT_RELA:
+            fp.seek(info['sh_offset'])
+            while fp.tell() < (info['sh_offset'] + info['sh_size']):
+                tag_elf32_rela(fp, e_machine)
 
     # read program headers
     fp.seek(e_phoff)
