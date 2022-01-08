@@ -51,7 +51,7 @@ def ELF32_R_TYPE(info):
     return info & 0xFF
 
 def tag_elf32_sym(fp, index, strTab:StringTable):
-    tmp = fp.tell()
+    base = fp.tell()
 
     st_name = uint32(fp, 1)
     nameStr = strTab[st_name]
@@ -70,16 +70,16 @@ def tag_elf32_sym(fp, index, strTab:StringTable):
     st_other = tagUint8(fp, "st_other")
 
     st_shndx = tagUint16(fp, "st_shndx")
-    fp.seek(tmp)
+    fp.seek(base)
     tag(fp, SIZE_ELF32_SYM, "Elf32_Sym \"%s\" (index:%d)" % (nameStr, index))
 
 def tag_elf32_dyn(fp):
-    tmp = fp.tell()
+    base = fp.tell()
     d_tag = uint32(fp, 1)
     tagStr = dynamic_type_tostr(d_tag)
     tag(fp, 4, "d_tag:0x%X (%s)" % (d_tag, tagStr))
     tagUint32(fp, "val_ptr")
-    fp.seek(tmp)
+    fp.seek(base)
     tag(fp, SIZE_ELF32_DYN, "Elf32_Dyn (%s)" % tagStr)
 
     if d_tag == DT_NULL:
