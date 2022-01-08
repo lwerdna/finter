@@ -748,6 +748,7 @@ def analyze(fp):
         for i in range(symtab_amount):
             sym_name = tag_nlist(fp, cputype, symtab_strtab_offset)
             symtab_strings.append(sym_name)
+        print('[0x%X,0x%X) symbol table contents' % (symtab_offset, fp.tell()))
 
     # parse relocation areas referenced by sections
     for (reloff, nreloc, info) in reloc_areas:
