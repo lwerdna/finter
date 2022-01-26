@@ -4,6 +4,7 @@ import sys
 import struct
 import binascii
 
+from . import dwarf
 from .elf import *
 from .helpers import *
 
@@ -57,6 +58,8 @@ def analyze(fp):
     dynamic = None
     symtab = None
     strtab = None
+    debug_info = None
+    debug_abbrev = None
     fp.seek(e_shoff)
     for i in range(e_shnum):
         oHdr = fp.tell()
@@ -87,6 +90,10 @@ def analyze(fp):
             strtab = [sh_offset, sh_size]
         if strName == '.opd':
             opd = [sh_offset, sh_size, sh_addr]
+        if strName == '.debug_info':
+            debug_info = [sh_offset, sh_size]
+        if strName == '.debug_abbrev':
+            debug_abbrev = [sh_offset, sh_size]
 
         print('[0x%X,0x%X) elf64_shdr "%s" %s' % \
             (oHdr, fp.tell(), scnStrTab[sh_name], strType))
@@ -164,6 +171,28 @@ def analyze(fp):
                 tag(fp, 24, "descriptor %d" % func_descr_idx)
 
             func_descr_idx += 1
+
+    if debug_info:
+        [scn_addr, scn_sz] = debug_info
+        fp.seek(scn_addr)
+
+        while fp.tell() < (scn_addr + scn_sz):
+            cu_base = fp.tell()
+
+            fp.seek(cu_base)
+            (len_header, len_body) = dwarf.tag_compilation_unit_header(fp)
+
+            fp.seek(cu_base + len_header)
+            tag(fp, len_body, 'compilation unit contents', True)
+
+            #tagUleb128(fp, "abbrev_code")
+
+            fp.seek(cu_base + len_header + len_body)
+
+    if debug_abbrev:
+        [scn_addr, scn_sz] = debug_abbrev
+        fp.seek(scn_addr)
+        dwarf.tag_debug_abbrev(fp, scn_addr, scn_sz)
 
     # read program headers
     fp.seek(e_phoff)
