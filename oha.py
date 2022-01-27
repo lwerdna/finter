@@ -96,15 +96,6 @@ def oha(data, addr, comment=None):
 
 if __name__ == '__main__':
 
-#    print('--')
-#    print(oha_comment(b'\x00\x00\x00\x01', 0x180CB04, 'sh_name=0x1'))
-#    print('--')
-#    print(oha_comment(b'\x00\x00\x00\x03', 0x180CB8, 'sh_type=0x3'))
-#    print('--')
-#    print(oha_comment(b'\x00\x00\x00\x00', 0x180CBC, 'sh_flags=0'))
-#    print('--')
-#    print(oha_comment(b'\x00\x00\x00\x00', 0x180CC0, 'sh_addr=0'))
-
     if len(sys.argv) < 2:
         print('ERROR: missing file parameter')
         print('usage: %s <file>' % sys.argv[0])
@@ -117,9 +108,6 @@ if __name__ == '__main__':
     root = interval_tree_to_hierarchy(interval_tree, OhaNode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
-
-    #for top_level_node in sorted_children:
-    #    print('0x%08X: %s' % (top_level_node.interval.begin, str(top_level_node.interval)))
 
     with open(sys.argv[1], 'rb') as fp:
         root.setfp(fp)

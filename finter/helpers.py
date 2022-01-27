@@ -256,6 +256,8 @@ def tag(FP, length, comment, rewind=0):
 def tagUint8(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint8(FP, peek)
+    if type(comment) == types.FunctionType:
+        comment = comment(val)
     print('[0x%X,0x%X) %s=0x%X %s' % (pos, pos+1, name, val, comment))
     return val
 
@@ -277,12 +279,12 @@ def tagUint64(FP, name, comment='', peek=0):
     print('[0x%X,0x%X) %s=0x%X %s' % (pos, pos+8, name, val, comment))
     return val
 
-def tagUleb128(FP, comment, peek=0):
+def tagUleb128(FP, name, comment='', peek=0):
     pos = FP.tell()
     (val, length) = uleb128(FP, peek)
     if type(comment) == types.FunctionType:
         comment = comment(val)
-    print('[0x%X,0x%X) %s=0x%X' % (pos, pos+length, comment, val))
+    print('[0x%X,0x%X) %s=0x%X %s' % (pos, pos+length, name, val, comment))
     return val
 
 def tagString(FP, length, comment, peek=0):
