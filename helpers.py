@@ -51,13 +51,15 @@ def interval_fragments(start, end, intervals):
     return list(frag_tree)
 
 class hnode():
-    def __init__(self, interval):
-        self.interval = interval
+    def __init__(self, begin, end, data):
+        self.begin = begin
+        self.end = end
+        self.data = data
         self.children = []
     def __str__(self, depth=0):
         result = '  '*depth+'hnode'
-        result += str(self.interval) + '\n'
-        for c in sorted(self.children, key=lambda x: x.interval.begin):
+        result += '[%d, %d)\n' % (self.begin, self.end)
+        for c in sorted(self.children, key=lambda x: x.begin):
             result += c.__str__(depth+1)
         return result
 
@@ -81,8 +83,8 @@ def interval_tree_to_hierarchy(tree, NodeClass=hnode):
                 child2parent[c] = min(child2parent[c], parent, key=lambda x: x.length())
 
     # wrap the child2parent relationships into hnode
-    hnRoot = NodeClass(Interval(tree.begin(), tree.end(), "root"))
-    inter2node = { x:NodeClass(x) for x in tree }
+    hnRoot = NodeClass(tree.begin(), tree.end(), "root")
+    inter2node = { x:NodeClass(x.begin, x.end, x.data) for x in tree }
 
     for (child, parent) in child2parent.items():
         hnChild = inter2node[child]

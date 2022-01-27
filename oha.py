@@ -16,9 +16,12 @@ CYAN = '\x1B[96m'
 NORMAL = '\x1B[0m'
 
 class OhaNode():
-    def __init__(self, interval):
-        self.interval = interval
+    def __init__(self, begin, end, comment):
+        self.begin = begin
+        self.end = end
+        self.comment = comment
         self.children = []
+        self.fp = None
 
     def setfp(self, fp):
         self.fp = fp
@@ -26,27 +29,32 @@ class OhaNode():
             child.setfp(fp)
 
     def pprint(self, depth=0):
-        truncate = False
-        #truncate = True
-        addr = self.interval.begin
-        comment = '  '*depth + self.interval.data
+        tree = IntervalTree()
+        tree.add(Interval(self.begin, self.end))
 
-        if self.children:
-            oha_comment(addr, comment)
-            for child in sorted(self.children, key=lambda x: x.interval.begin):
-                child.pprint(depth+1)
+        for child in self.children:
+            tree.chop(child.begin, child.end)
+            tree.add(Interval(child.begin, child.end, child))
+
+        intervals = sorted(tree.items())
+
+        # if a child exists right where we start, emit a comment for this
+        # enveloping structure, otherwise the first gap gets our comment
+        comment = '  '*depth + self.comment
+
+        if type(intervals[0].data) == OhaNode:
+            oha_comment(self.begin, comment)
         else:
-            #if length > 1024:
-            length = self.interval.length()
-            self.fp.seek(addr)
-            data = self.fp.read(length)
+            intervals[0] = Interval(intervals[0].begin, intervals[0].end, comment)
 
-            if truncate and length > 1024:
-                oha(data[0:512], addr, comment)
-                print('%s~~~~~~~~%s' % (YELLOW, NORMAL))
-                oha(data[-512:], addr + length - 512, comment)
+        for interval in intervals:
+            if type(interval.data) == OhaNode:
+                node = interval.data
+                node.pprint(depth+1)
             else:
-                oha(data, addr, comment)
+                self.fp.seek(self.begin)
+                data = self.fp.read(interval.length())
+                oha(data, interval.begin, interval.data)
 
 def oha_comment(addr, comment):
     print(75*' '+CYAN+comment+NORMAL)
@@ -108,7 +116,8 @@ if __name__ == '__main__':
 
     root = interval_tree_to_hierarchy(interval_tree, OhaNode)
 
-    sorted_children = sorted(root.children, key=lambda x: x.interval.begin)
+    sorted_children = sorted(root.children, key=lambda x: x.begin)
+
     #for top_level_node in sorted_children:
     #    print('0x%08X: %s' % (top_level_node.interval.begin, str(top_level_node.interval)))
 

@@ -10,12 +10,11 @@ from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarch
 def print_recur(hnode, depth=0):
     indent = depth*'  '
 
-    a = hnode.interval
-    length = a.length()
+    length = hnode.end - hnode.begin
     lengthStr = '%d'%length if length < 16 else '0x%X'%length
-    print('[%08X, %08X) %s(%s) %s' % (a.begin, a.begin+length, indent, lengthStr, a.data))
+    print('[%08X, %08X) %s(%s) %s' % (hnode.begin, hnode.end, indent, lengthStr, hnode.data))
 
-    for child in sorted(hnode.children, key=lambda x: x.interval.begin):
+    for child in sorted(hnode.children, key=lambda x: x.begin):
         print_recur(child, depth+1)
 
 if __name__ == '__main__':
