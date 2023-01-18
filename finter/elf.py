@@ -358,6 +358,16 @@ def phdr_type_tostr(x):
         strType = 'PROC'
     return 'UNKNOWN'
 
+PF_X = 1
+PF_W = 2
+PF_R = 4
+def phdr_flags_tostr(x):
+    fstrs = []
+    if x & PF_R: fstrs.append('PF_R')
+    if x & PF_W: fstrs.append('PF_W')
+    if x & PF_X: fstrs.append('PF_X')
+    return '|'.join(fstrs)
+
 DT_NULL = 0
 DT_NEEDED = 1
 DT_PLTRELSZ = 2

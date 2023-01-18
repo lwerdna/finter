@@ -63,6 +63,7 @@ def oha(data, addr, comment=None):
     """ offset, hex, ascii (OHA) of data """
 
     result = []
+    va_last_printed = None
     va_lo = addr
     va_hi = addr + len(data)
 
@@ -70,6 +71,13 @@ def oha(data, addr, comment=None):
     while va < va_hi:
         hex_str = ''
         ascii_str = ''
+
+        if va == va_last_printed:
+            addr_str = '        '
+        else:
+            addr_str = '%08X' % va
+            va_last_printed = va
+
         for i in range(16):
             if va+i >= va_lo and va+i < va_hi:
                 x = data[va+i - va_lo]
@@ -82,13 +90,13 @@ def oha(data, addr, comment=None):
         if comment:
             (cmargin, comment) = re.match(r'^(\s*)(.*)', comment).group(1, 2)
             comment = comment.split('\\n')
-            print('%s%08X%s %s %s%s%s %s%s%s%s' % \
-                (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL, CYAN, cmargin, comment[0], NORMAL))
+            print('%s%s%s %s %s%s%s %s%s%s%s' % \
+                (YELLOW, addr_str, NORMAL, hex_str, PURPLE, ascii_str, NORMAL, CYAN, cmargin, comment[0], NORMAL))
             for c in comment[1:]:
                 print('%s%s%s' % (CYAN, 75*' '+cmargin + c, NORMAL))
             comment = ''
         else:
-            print('%s%08X%s %s %s%s%s' % (YELLOW, va, NORMAL, hex_str, PURPLE, ascii_str, NORMAL))
+            print('%s%s%s %s %s%s%s' % (YELLOW, addr_str, NORMAL, hex_str, PURPLE, ascii_str, NORMAL))
 
         va += 16
 

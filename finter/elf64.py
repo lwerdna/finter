@@ -198,19 +198,19 @@ def analyze(fp):
     fp.seek(e_phoff)
     for i in range(e_phnum):
         oHdr = fp.tell()
-        p_type = tagUint32(fp, "p_type")
-        tagUint32(fp, "p_flags")
-        tagUint64(fp, "p_offset")
-        tagUint64(fp, "p_vaddr")
-        tagUint64(fp, "p_paddr")
-        tagUint64(fp, "p_filesz")
-        tagUint64(fp, "p_memsz")
-        tagUint64(fp, "p_align")
+        p_type = uint32(fp, True)
+        tagUint32(fp, 'p_type', '('+phdr_type_tostr(p_type)+')')
+        p_flags = uint32(fp, True)
+        tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
+        tagUint64(fp, 'p_offset')
+        tagUint64(fp, 'p_vaddr')
+        tagUint64(fp, 'p_paddr')
+        tagUint64(fp, 'p_filesz')
+        tagUint64(fp, 'p_memsz')
+        tagUint64(fp, 'p_align')
 
-        strType = phdr_type_tostr(p_type)
-
-        print('[0x%X,0x%X) elf64_phdr %d %s' % \
-            (oHdr, fp.tell(), i, strType))
+        print('[0x%X,0x%X) elf64_phdr index=%d' % \
+            (oHdr, fp.tell(), i))
 
 if __name__ == '__main__':
     import sys
