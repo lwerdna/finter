@@ -195,6 +195,7 @@ def analyze(fp):
         dwarf.tag_debug_abbrev(fp, scn_addr, scn_sz)
 
     # read program headers
+    # REMINDER! struct member 'p_flags' changes between 32/64 bits
     fp.seek(e_phoff)
     for i in range(e_phnum):
         oHdr = fp.tell()

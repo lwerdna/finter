@@ -215,16 +215,17 @@ def analyze(fp):
                 tag_elf32_rela(fp, e_machine)
 
     # read program headers
+    # REMINDER! struct member 'p_flags' changes between 32/64 bits
     fp.seek(e_phoff)
     for i in range(e_phnum):
         oHdr = fp.tell()
         p_type = tagUint32(fp, "p_type")
-        tagUint32(fp, "p_flags")
         tagUint32(fp, "p_offset")
         tagUint32(fp, "p_vaddr")
         tagUint32(fp, "p_paddr")
         tagUint32(fp, "p_filesz")
         tagUint32(fp, "p_memsz")
+        tagUint32(fp, "p_flags")
         tagUint32(fp, "p_align")
 
         strType = phdr_type_tostr(p_type)
