@@ -104,7 +104,7 @@ def interval_tree_to_hierarchy(tree, NodeClass=hnode):
 def find_dissector(fpath):
     """ given a file path, return a dissector function """
 
-    # first try if file will help us
+    # first try if `file` will help us
     sig2dissector = [
         (r'GPG symmetrically encrypted data', gpg.analyze),
         (r'ELF 32-bit (LSB|MSB)', elf32.analyze),
@@ -114,7 +114,8 @@ def find_dissector(fpath):
         (r'Dalvik dex file', dex.analyze),
         (r'MS-DOS executable', exe.analyze),
         (r'Mach-O ', macho.analyze),
-        (r'RIFF \(little-endian\) data, WAVE audio', wav.analyze)
+        (r'RIFF \(little-endian\) data, WAVE audio', wav.analyze),
+        (r'^COMBO_BOOT', combo_boot.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
@@ -125,11 +126,16 @@ def find_dissector(fpath):
             analyze = dissector
             break
 
+    # next see if a file sample might help us
+    sample = open(fpath, 'rb').read(32)
+    if sample.startswith(b'COMBO_BOOT\x00\x00'):
+        analyze = combo_boot.analyze
+
+    # next guess based on file name or extension
     if not analyze:
         if fpath.endswith('.rel'):
-            with open(fpath, 'rb') as fp:
-                if re.match(r'[XDQ][HL][234]\x0a', fp.read(4).decode('utf-8')):
-                    analyze = rel.analyze
+            if re.match(r'[XDQ][HL][234]\x0a', sample.decode('utf-8')):
+                analyze = rel.analyze
         elif fpath.endswith('.ihx'):
             analyze = ihx.analyze
         elif fpath.endswith('.mkv'):
