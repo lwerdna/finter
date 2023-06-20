@@ -4,7 +4,6 @@
 
 import re
 import sys
-from intervaltree import Interval, IntervalTree
 from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy
 
 RED = '\x1B[31m'
@@ -29,32 +28,32 @@ class OhaNode():
             child.setfp(fp)
 
     def pprint(self, depth=0):
-        tree = IntervalTree()
-        tree.add(Interval(self.begin, self.end))
-
-        for child in self.children:
-            tree.chop(child.begin, child.end)
-            tree.add(Interval(child.begin, child.end, child))
-
-        intervals = sorted(tree.items())
-
-        # if a child exists right where we start, emit a comment for this
-        # enveloping structure, otherwise the first gap gets our comment
         comment = '  '*depth + self.comment
 
-        if type(intervals[0].data) == OhaNode:
-            oha_comment(self.begin, comment)
-        else:
-            intervals[0] = Interval(intervals[0].begin, intervals[0].end, comment)
-
-        for interval in intervals:
-            if type(interval.data) == OhaNode:
-                node = interval.data
-                node.pprint(depth+1)
+        first = True
+        position = self.begin
+        for child in sorted(self.children, key=lambda c: c.begin):
+            if position == child.begin:
+                if first: oha_comment(position, comment)
+                child.pprint(depth+1)
+                position = child.end
             else:
-                self.fp.seek(self.begin)
-                data = self.fp.read(interval.length())
-                oha(data, interval.begin, interval.data)
+                fragment_length = child.begin - position
+                self.fp.seek(position)
+                data = self.fp.read(fragment_length)
+                oha(data, position, comment if first else 'fragment')
+
+            first = False
+
+        # did the children cover everything?
+        if position < self.end:
+            fragment_length = self.end - position
+            self.fp.seek(position)
+            data = self.fp.read(fragment_length)
+            oha(data, position, comment if first else 'fragment')
+
+    def __str__(self):
+        return f'[0x{self.begin:X} 0x{self.end:X}) {self.comment}'
 
 def oha_comment(addr, comment):
     print(75*' '+CYAN+comment+NORMAL)
@@ -119,6 +118,7 @@ if __name__ == '__main__':
 
     with open(sys.argv[1], 'rb') as fp:
         root.setfp(fp)
-        for ch in sorted_children:
-            ch.pprint()
+
+        for child in sorted_children:
+            root.pprint()
 
