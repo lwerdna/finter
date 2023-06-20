@@ -219,19 +219,19 @@ def analyze(fp):
     fp.seek(e_phoff)
     for i in range(e_phnum):
         oHdr = fp.tell()
-        p_type = tagUint32(fp, "p_type")
+        p_type = uint32(fp, True)
+        tagUint32(fp, 'p_type', '('+phdr_type_tostr(p_type)+')')
         tagUint32(fp, "p_offset")
         tagUint32(fp, "p_vaddr")
         tagUint32(fp, "p_paddr")
         tagUint32(fp, "p_filesz")
         tagUint32(fp, "p_memsz")
-        tagUint32(fp, "p_flags")
+        p_flags = uint32(fp, True)
+        tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
         tagUint32(fp, "p_align")
 
-        strType = phdr_type_tostr(p_type)
-
-        print('[0x%X,0x%X) elf32_phdr %d %s' % \
-            (oHdr, fp.tell(), i, strType))
+        print('[0x%X,0x%X) elf32_phdr index=%d' % \
+            (oHdr, fp.tell(), i))
 
 if __name__ == '__main__':
     with open(sys.argv[1], 'rb') as fp:
