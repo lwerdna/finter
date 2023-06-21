@@ -21,4 +21,9 @@ def analyze(fp):
         return
 
     gen_device_header(fp)
-    file_info_image(fp)
+
+    while True:
+        if peek(fp, 3) == GFH_HEADER_MAGIC:
+            gfh_header(fp)
+        else:
+            break

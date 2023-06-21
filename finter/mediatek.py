@@ -1,8 +1,32 @@
+import struct
+
 from .helpers import *
 
+GFH_HEADER_MAGIC = b'MMM'
+
 # BRLYT = "BootRom LaYouT"
-BRLYT_NAME = b"BRLYT"
-BRLYT_MAGIC = b"\x42\x42\x42\x42"
+BRLYT_NAME = b'BRLYT'
+BRLYT_MAGIC = b'\x42\x42\x42\x42'
+
+class GFH_TYPE_:
+    FILE_INFO = 0
+    BL_INFO = 1
+    ANTI_CLONE = 2
+    BL_SEC_KEY = 3
+    BROM_CFG = 7
+    BROM_SEC_CFG = 8
+
+GFH_FILE_INFO_NAME = b'FILE_INFO'
+
+GFH_BROM_CFG_USBDL_BY_AUTO_DETECT_TIMEOUT_EN = 0x02
+GFH_BROM_CFG_USBDL_AUTO_DETECT_DIS = 0x10
+GFH_BROM_CFG_USBDL_BY_KCOL0_TIMEOUT_EN = 0x80
+GFH_BROM_CFG_USBDL_BY_FLAG_TIMEOUT_EN = 0x100
+GFH_BROM_CFG_JUMP_BL_ARM64_EN = 0x1000
+GFH_BROM_CFG_JUMP_BL_ARM64 = 0x64
+
+BROM_SEC_CFG_JTAG_EN = 1
+BROM_SEC_CFG_UART_EN = 2
 
 #
 # struct brom_layout_header {
@@ -99,46 +123,66 @@ def gen_device_header(fp):
     length = fp.tell() - start
     print(f'[0x{start:X},0x{start+length:X}) struct gen_device_header')
 
-# https://wiki.postmarketos.org/wiki/MediaTek
-# except I think the length field is just a word
-def file_info_image(fp):
+def gfh_common_header(fp):
     start = fp.tell()
 
-    magic = tag(fp, 4, 'magic0')
-    assert magic == b'\x4d\x4d\x4d\x01'
-    len_header = tagUint16(fp, 'length (of complete header)')
-    tagUint16(fp, 'unknown')
-    magic = tag(fp, 12, 'magic1')
-    assert magic == b'FILE_INFO\x00\x00\x00'
-    magic = tagUint32(fp, 'magic2')
-    assert magic == 1
+    m = tag(fp, 3, 'magic')
+    assert m == GFH_HEADER_MAGIC
+    tagUint8(fp, 'version')
+    size = tagUint16(fp, 'size')
+
+    def comm(val):
+        lookup = {0:'GFH_TYPE_FILE_INFO', 1:'GFH_TYPE_BL_INFO',
+            2:'GFH_TYPE_ANTI_CLONE', 3:'GFH_TYPE_BL_SEC_KEY',
+            7:'GFH_TYPE_BROM_CFG', 8:'GFH_TYPE_BROM_SEC_CFG'}
+        return '('+lookup.get(val, 'unknown')+')'
+    type_ = tagUint16(fp, 'type', comm)
+
+    length = fp.tell() - start
+    print(f'[0x{start:X},0x{start+length:X}) struct gfh_common_header')
+
+    return {'size':size, 'type':type_}
+
+# https://wiki.postmarketos.org/wiki/MediaTek
+# except I think the length field is just a word
+#
+# update: it's a gfh_common_header
+# https://github.com/trini/u-boot/blob/master/tools/mtk_image.h
+def gfh_file_info(fp):
+    start = fp.tell()
+
+    gfh_common_header(fp)
+
+    name = tag(fp, 12, 'name[12]')
+    assert name == GFH_FILE_INFO_NAME + b'\x00\x00\x00'
+    unused = tagUint32(fp, 'unused')
 
     def gen_comment0(val):
         lookup = {0:'NONE', 1:'ARM-Bootloader', 2:'ARM-External-Bootloader',
             10:'Root-Certificate', 256:'Primary-MAUI', 264:'VIVA',
             769:'SECURE_RO_ME'}
-        return f'({lookup.get(val, "Unknown")})'
-    tagUint16(fp, 'image_type', gen_comment0)
+        return f'({lookup.get(val, "unknown")})'
+    tagUint16(fp, 'file_type', gen_comment0)
 
     def gen_comment1(val):
         lookup = {0:'NONE', 1:'NOR Flash', 2:'NAND Sequential Flash',
             3:'HAND_TTBL', 4:'NAND_FDM50', 5:'EMMC-Boot-Region',
             6:'EMMC-DAta-Region', 7:'Serial Flash', 255:'Device-End'}
         return f'({lookup.get(val, "Unknown")})'
-    tagUint8(fp, 'storage_type', gen_comment1)
+    tagUint8(fp, 'flash_type', gen_comment1)
 
     def gen_comment2(val):
-        lookup = {0:'No Signature', 1:'PHASH', 2:'SINGLE and PHASH',
+        lookup = {0:'GFH_SIG_TYPE_NONE', 1:'GFH_SIG_TYPE_SHA256', 2:'SINGLE and PHASH',
             4: 'MULTI', 5:'TYPE_NUM', 255:'TYPE_END'}
         return f'({lookup.get(val, "Unknown")})'
-    tagUint8(fp, 'signature_type', gen_comment2)
+    tagUint8(fp, 'sig_type', gen_comment2)
 
-    tagUint32(fp, 'load_address')
-    tagUint32(fp, 'total_file_sz')
-    max_file_sz = tagUint32(fp, 'max_file_sz')
-    #assert max_file_sz == 0x40000
-    tagUint32(fp, 'content_offset')
-    tagUint32(fp, 'signature_length')
+    tagUint32(fp, 'load_addr')
+    tagUint32(fp, 'total_size')
+    max_size = tagUint32(fp, 'max_size')
+    #assert max_size == 0x40000
+    tagUint32(fp, 'hdr_size')
+    tagUint32(fp, 'sig_size')
     tagUint32(fp, 'jump_offset')
 
     def gen_comment3(val):
@@ -146,8 +190,101 @@ def file_info_image(fp):
         if val & 1: result.append('POST_BUILD_DONE')
         if val & 2: result.append('Execute In Place')
         return '('+'|'.join(result)+')' if result else ''
-    tagUint32(fp, 'ending', gen_comment3)
+    tagUint32(fp, 'processed', gen_comment3)
 
     length = fp.tell() - start
-    assert length == len_header
-    print(f'[0x{start:X},0x{start+length:X}) struct file_info_image')
+    #assert length == len_header
+    print(f'[0x{start:X},0x{start+length:X}) struct gfh_file_info')
+
+def gfh_bl_info(fp):
+    start = fp.tell()
+    gfh_common_header(fp)
+    tagUint32(fp, 'attr')
+    length = fp.tell() - start
+    print(f'[0x{start:X},0x{start+length:X}) struct gfh_bl_info')
+
+def gfh_brom_cfg(fp):
+    start = fp.tell()
+    gfh_common_header(fp)
+
+    # config bits
+    def comment(val):
+        result = []
+        if val & GFH_BROM_CFG_USBDL_BY_AUTO_DETECT_TIMEOUT_EN:
+            result.append('USBDL_BY_AUTO_DETECT_TIMEOUT_EN')
+        if val & GFH_BROM_CFG_USBDL_AUTO_DETECT_DIS:
+            result.append('USBDL_AUTO_DETECT_DIS')
+        if val & GFH_BROM_CFG_USBDL_BY_KCOL0_TIMEOUT_EN:
+            result.append('USBDL_BY_KCOL0_TIMEOUT_EN')
+        if val & GFH_BROM_CFG_USBDL_BY_FLAG_TIMEOUT_EN:
+            result.append('USBDL_BY_FLAG_TIMEOUT_EN')
+        if val & GFH_BROM_CFG_JUMP_BL_ARM64_EN:
+            result.append('JUMP_BL_ARM64_EN')
+        if val & GFH_BROM_CFG_JUMP_BL_ARM64:
+            result.append('JUMP_BL_ARM64')
+        return '('+'|'.join(result)+')' if result else ''
+    tagUint32(fp, 'cfg_bits', comment)
+
+    tagUint32(fp, 'usbdl_by_auto_detect_timeout_ms')
+    tag(fp, 0x45, 'unused')
+    tagUint8(fp, 'jump_bl_arm64')
+    tag(fp, 2, 'unused')
+    tagUint32(fp, 'usbdl_by_kcol0_timeout_ms')
+    tagUint32(fp, 'usbdl_by_flag_timeout_ms')
+    tagUint32(fp, 'pad')
+    length = fp.tell() - start
+    print(f'[0x{start:X},0x{start+length:X}) struct gfh_brom_cfg')
+
+def gfh_anti_clone(fp):
+    start = fp.tell()
+    gfh_common_header(fp)
+    tagUint8(fp, 'ac_b2k')
+    tagUint8(fp, 'ac_b2c')
+    tagUint16(fp, 'pad')
+    tagUint32(fp, 'ac_offset')
+    tagUint32(fp, 'ac_len')
+    length = fp.tell() - start
+    print(f'[0x{start:X},0x{start+length:X}) struct gfh_anti_clone')
+
+def gfh_brom_sec_cfg(fp):
+    start = fp.tell()
+    gfh_common_header(fp)
+    def comment(val):
+        result = []
+        if val & BROM_SEC_CFG_JTAG_EN:
+            result.append('BROM_SEC_CFG_JTAG_EN')
+        if val & BROM_SEC_CFG_UART_EN:
+            result.append('BROM_SEC_CFG_UART_EN')
+        return '('+'|'.join(result)+')' if result else ''
+    tagUint8(fp, 'cfg_bits', comment)
+    tag(fp, 0x20, 'customer_name[0x20]')
+    tagUint32(fp, 'pad')
+    length = fp.tell() - start
+    print(f'[0x{start:X},0x{start+length:X}) struct gfh_brom_sec_cfg')
+
+def gfh_header(fp):
+    # sample the common header
+    sample = peek(fp, 8)
+    assert sample[0:3] == GFH_HEADER_MAGIC
+    type_, = struct.unpack_from('<H', sample, 6)
+
+    mark = fp.tell()
+
+    match type_:
+        case GFH_TYPE_.FILE_INFO:
+            gfh_file_info(fp)
+        case GFH_TYPE_.BL_INFO:
+            gfh_bl_info(fp)
+        case GFH_TYPE_.BROM_CFG:
+            gfh_brom_cfg(fp)
+        case GFH_TYPE_.ANTI_CLONE:
+            gfh_anti_clone(fp)
+        case GFH_TYPE_.BROM_SEC_CFG:
+            gfh_brom_sec_cfg(fp)
+        case _:
+            # unknown type, read common header and skip over what it contained
+            mark = fp.tell()
+            info = gfh_common_header(fp)
+            fp.seek(mark + info['size'])
+
+        #case GFH_TYPE_BL_INFO:
