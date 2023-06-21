@@ -99,4 +99,55 @@ def gen_device_header(fp):
     length = fp.tell() - start
     print(f'[0x{start:X},0x{start+length:X}) struct gen_device_header')
 
+# https://wiki.postmarketos.org/wiki/MediaTek
+# except I think the length field is just a word
+def file_info_image(fp):
+    start = fp.tell()
 
+    magic = tag(fp, 4, 'magic0')
+    assert magic == b'\x4d\x4d\x4d\x01'
+    len_header = tagUint16(fp, 'length (of complete header)')
+    tagUint16(fp, 'unknown')
+    magic = tag(fp, 12, 'magic1')
+    assert magic == b'FILE_INFO\x00\x00\x00'
+    magic = tagUint32(fp, 'magic2')
+    assert magic == 1
+
+    def gen_comment0(val):
+        lookup = {0:'NONE', 1:'ARM-Bootloader', 2:'ARM-External-Bootloader',
+            10:'Root-Certificate', 256:'Primary-MAUI', 264:'VIVA',
+            769:'SECURE_RO_ME'}
+        return f'({lookup.get(val, "Unknown")})'
+    tagUint16(fp, 'image_type', gen_comment0)
+
+    def gen_comment1(val):
+        lookup = {0:'NONE', 1:'NOR Flash', 2:'NAND Sequential Flash',
+            3:'HAND_TTBL', 4:'NAND_FDM50', 5:'EMMC-Boot-Region',
+            6:'EMMC-DAta-Region', 7:'Serial Flash', 255:'Device-End'}
+        return f'({lookup.get(val, "Unknown")})'
+    tagUint8(fp, 'storage_type', gen_comment1)
+
+    def gen_comment2(val):
+        lookup = {0:'No Signature', 1:'PHASH', 2:'SINGLE and PHASH',
+            4: 'MULTI', 5:'TYPE_NUM', 255:'TYPE_END'}
+        return f'({lookup.get(val, "Unknown")})'
+    tagUint8(fp, 'signature_type', gen_comment2)
+
+    tagUint32(fp, 'load_address')
+    tagUint32(fp, 'total_file_sz')
+    max_file_sz = tagUint32(fp, 'max_file_sz')
+    #assert max_file_sz == 0x40000
+    tagUint32(fp, 'content_offset')
+    tagUint32(fp, 'signature_length')
+    tagUint32(fp, 'jump_offset')
+
+    def gen_comment3(val):
+        result = []
+        if val & 1: result.append('POST_BUILD_DONE')
+        if val & 2: result.append('Execute In Place')
+        return '('+'|'.join(result)+')' if result else ''
+    tagUint32(fp, 'ending', gen_comment3)
+
+    length = fp.tell() - start
+    assert length == len_header
+    print(f'[0x{start:X},0x{start+length:X}) struct file_info_image')

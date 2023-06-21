@@ -120,5 +120,5 @@ if __name__ == '__main__':
         root.setfp(fp)
 
         for child in sorted_children:
-            root.pprint()
+            child.pprint()
 

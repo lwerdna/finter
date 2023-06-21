@@ -21,3 +21,4 @@ def analyze(fp):
         return
 
     gen_device_header(fp)
+    file_info_image(fp)
