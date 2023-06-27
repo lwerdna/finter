@@ -22,8 +22,24 @@ def analyze(fp):
 
     gen_device_header(fp)
 
+    o_sig_type_5 = None
+
     while True:
-        if peek(fp, 3) == GFH_HEADER_MAGIC:
-            gfh_header(fp)
-        else:
+        anchor = fp.tell()
+
+        if peek(fp, 3) != GFH_HEADER_MAGIC:
             break
+
+        info = gfh_header(fp)
+
+        if info['type'] == GFH_TYPE_.FILE_INFO:
+            if info['sig_type'] == 5 and info['sig_size']:
+                o_sig_type_5 = anchor + info['total_size'] - info['sig_size']
+
+    if o_sig_type_5:
+        fp.seek(o_sig_type_5)
+
+        num_entries, = struct.unpack('<I', fp.read(4))
+
+        for i in range(num_entries):
+            sig_5_entry(fp)
