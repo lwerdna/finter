@@ -20,6 +20,7 @@ class OhaNode():
         self.end = end
         self.comment = comment
         self.children = []
+        self.parent = None
         self.fp = None
 
     def setfp(self, fp):

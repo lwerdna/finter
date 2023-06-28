@@ -56,6 +56,8 @@ class hnode():
         self.end = end
         self.data = data
         self.children = []
+        self.parent = None
+
     def __str__(self, depth=0):
         result = '  '*depth+'hnode'
         result += '[%d, %d)\n' % (self.begin, self.end)
@@ -84,14 +86,16 @@ def interval_tree_to_hierarchy(tree, NodeClass=hnode):
 
     # wrap the child2parent relationships into hnode
     hnRoot = NodeClass(tree.begin(), tree.end(), "root")
-    inter2node = { x:NodeClass(x.begin, x.end, x.data) for x in tree }
+    interval_to_node = { x:NodeClass(x.begin, x.end, x.data) for x in tree }
 
     for (child, parent) in child2parent.items():
-        hnChild = inter2node[child]
+        hnChild = interval_to_node[child]
         if not parent:
+            hnChild.parent = hnRoot
             hnRoot.children.append(hnChild)
         else:
-            hnParent = inter2node[parent]
+            hnParent = interval_to_node[parent]
+            hnChild.parent = hnParent
             hnParent.children.append(hnChild)
 
     # done

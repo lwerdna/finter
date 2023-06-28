@@ -11,6 +11,7 @@ class sankeyNode():
     def __init__(self, interval):
         self.interval = interval
         self.children = []
+        self.parent = None
 
     def assign_index(self, curr=0):
         self.index = curr
