@@ -134,6 +134,8 @@ def find_dissector(fpath):
     sample = open(fpath, 'rb').read(32)
     if sample.startswith(b'COMBO_BOOT\x00\x00'):
         analyze = combo_boot.analyze
+    if sample.startswith(b'AVB0'):
+        analyze = avb.analyze
 
     # next guess based on file name or extension
     if not analyze:
