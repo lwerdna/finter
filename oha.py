@@ -88,40 +88,6 @@ def oha(data, addr, comment=None):
 
     return '\n'.join(result)
 
-def graph(root):
-    dot = []
-    dot.append('digraph G {')
-
-    # global graph settings
-    dot.append('// global settings')
-    dot.append('graph [rankdir="LR"]')
-    dot.append('node [];')
-    dot.append('edge [];')
-
-    # node list
-    def all_nodes(n):
-        return [n] + sum([all_nodes(c) for c in n.children], [])
-
-    dot.append('// nodes')
-    for n in all_nodes(root):
-        label = f'[0x{n.begin:X}, 0x{n.end:X})\\l{n.comment}'
-        dot.append(f'{id(n)} [label="{label}"];')
-
-    def all_edges(n):
-        result = [(n, c) for c in n.children]
-        result = result + sum([all_edges(c) for c in n.children], [])
-        return result
-
-    # edge list
-    dot.append('// edges')
-    for (a, b) in all_edges(root):
-        dot.append(f'{id(a)} -> {id(b)}')
-
-    dot.append('}')
-
-    print('\n'.join(dot))
-
-
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('ERROR: missing file parameter')

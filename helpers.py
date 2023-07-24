@@ -50,7 +50,8 @@ def interval_fragments(start, end, intervals):
         frag_tree.chop(i.begin, i.end)
     return list(frag_tree)
 
-class hnode():
+# minimum idea of "node"
+class FinterNode():
     def __init__(self, begin, end, data):
         self.begin = begin
         self.end = end
@@ -59,13 +60,13 @@ class hnode():
         self.parent = None
 
     def __str__(self, depth=0):
-        result = '  '*depth+'hnode'
+        result = '  '*depth+'FinterNode'
         result += '[%d, %d)\n' % (self.begin, self.end)
         for c in sorted(self.children, key=lambda x: x.begin):
             result += c.__str__(depth+1)
         return result
 
-def create_fragments(node, NodeClass=hnode):
+def create_fragments(node, NodeClass=FinterNode):
     result = []
 
     if not node.children:
@@ -75,13 +76,17 @@ def create_fragments(node, NodeClass=hnode):
     current = node.begin
     for child in sorted(node.children, key=lambda ch: ch.begin):
         if current < child.begin:
-            result.append(NodeClass(current, child.begin, 'fragment'))
+            frag = NodeClass(current, child.begin, 'fragment')
+            frag.parent = node
+            result.append(frag)
         result.append(child)
         current = child.end
 
     # fill possible gap after last child
     if current != node.end:
-        result.append(NodeClass(current, node.end, 'fragment'))
+        frag = NodeClass(current, node.end, 'fragment')
+        frag.parent = node
+        result.append(frag)
 
     # replace children with list that includes gaps
     node.children = result
@@ -90,8 +95,8 @@ def create_fragments(node, NodeClass=hnode):
     for child in node.children:
         create_fragments(child, NodeClass)
 
-def interval_tree_to_hierarchy(tree, NodeClass=hnode):
-    """ convert IntervalTree to a hierarchy using hnode """
+def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
+    """ convert IntervalTree to a hierarchy """
 
     # initialize interval -> node mapping
     child2parent = {i:None for i in tree}
@@ -109,7 +114,7 @@ def interval_tree_to_hierarchy(tree, NodeClass=hnode):
             else:
                 child2parent[c] = min(child2parent[c], parent, key=lambda x: x.length())
 
-    # wrap the child2parent relationships into hnode
+    # wrap the child2parent relationships
     hnRoot = NodeClass(tree.begin(), tree.end(), "root")
     interval_to_node = { x:NodeClass(x.begin, x.end, x.data) for x in tree }
 

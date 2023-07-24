@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import enum
 import types
 import binascii
 from struct import pack, unpack
@@ -307,11 +308,19 @@ def tagDataUntil(FP, term, comment, peek=0):
 # misc
 ###############################################################################
 
-def enum_int_to_name(en, value):
+# aids in quickly converting a number to a name in a python enum
+def enum_int_to_name(en, value:int):
     if any(member.value == value for member in en):
         return en(value).name
     else:
         return 'unknown'
+
+def flags_string(flags:enum.Enum, x:int):
+    result = []
+    for member in flags:
+        if x & member.value:
+            result.append(member.name)
+    return '|'.join(result)
 
 ###############################################################################
 # main
