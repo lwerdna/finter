@@ -31,27 +31,13 @@ class OhaNode():
     def pprint(self, depth=0):
         comment = '  '*depth + self.comment
 
-        first = True
-        position = self.begin
-        for child in sorted(self.children, key=lambda c: c.begin):
-            if position == child.begin:
-                if first: oha_comment(position, comment)
+        if self.children:
+            oha_comment(self.begin, comment)
+            for child in sorted(self.children, key=lambda c: c.begin):
                 child.pprint(depth+1)
-                position = child.end
-            else:
-                fragment_length = child.begin - position
-                self.fp.seek(position)
-                data = self.fp.read(fragment_length)
-                oha(data, position, comment if first else 'fragment')
-
-            first = False
-
-        # did the children cover everything?
-        if position < self.end:
-            fragment_length = self.end - position
-            self.fp.seek(position)
-            data = self.fp.read(fragment_length)
-            oha(data, position, comment if first else 'fragment')
+        else:
+            data = self.fp.read(self.end - self.begin)
+            oha(data, self.begin, comment)
 
     def __str__(self):
         return f'[0x{self.begin:X} 0x{self.end:X}) {self.comment}'
@@ -102,8 +88,41 @@ def oha(data, addr, comment=None):
 
     return '\n'.join(result)
 
-if __name__ == '__main__':
+def graph(root):
+    dot = []
+    dot.append('digraph G {')
 
+    # global graph settings
+    dot.append('// global settings')
+    dot.append('graph [rankdir="LR"]')
+    dot.append('node [];')
+    dot.append('edge [];')
+
+    # node list
+    def all_nodes(n):
+        return [n] + sum([all_nodes(c) for c in n.children], [])
+
+    dot.append('// nodes')
+    for n in all_nodes(root):
+        label = f'[0x{n.begin:X}, 0x{n.end:X})\\l{n.comment}'
+        dot.append(f'{id(n)} [label="{label}"];')
+
+    def all_edges(n):
+        result = [(n, c) for c in n.children]
+        result = result + sum([all_edges(c) for c in n.children], [])
+        return result
+
+    # edge list
+    dot.append('// edges')
+    for (a, b) in all_edges(root):
+        dot.append(f'{id(a)} -> {id(b)}')
+
+    dot.append('}')
+
+    print('\n'.join(dot))
+
+
+if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('ERROR: missing file parameter')
         print('usage: %s <file>' % sys.argv[0])
@@ -116,6 +135,11 @@ if __name__ == '__main__':
     root = interval_tree_to_hierarchy(interval_tree, OhaNode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
+
+    # debug?
+    if 0:
+        graph(root)
+        sys.exit(-1)
 
     with open(sys.argv[1], 'rb') as fp:
         root.setfp(fp)

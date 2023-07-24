@@ -65,6 +65,31 @@ class hnode():
             result += c.__str__(depth+1)
         return result
 
+def create_fragments(node, NodeClass=hnode):
+    result = []
+
+    if not node.children:
+        return
+
+    # fill gaps ahead of each child
+    current = node.begin
+    for child in sorted(node.children, key=lambda ch: ch.begin):
+        if current < child.begin:
+            result.append(NodeClass(current, child.begin, 'fragment'))
+        result.append(child)
+        current = child.end
+
+    # fill possible gap after last child
+    if current != node.end:
+        result.append(NodeClass(current, node.end, 'fragment'))
+
+    # replace children with list that includes gaps
+    node.children = result
+
+    # recur on children
+    for child in node.children:
+        create_fragments(child, NodeClass)
+
 def interval_tree_to_hierarchy(tree, NodeClass=hnode):
     """ convert IntervalTree to a hierarchy using hnode """
 
@@ -97,6 +122,9 @@ def interval_tree_to_hierarchy(tree, NodeClass=hnode):
             hnParent = interval_to_node[parent]
             hnChild.parent = hnParent
             hnParent.children.append(hnChild)
+
+    # create fragments
+    create_fragments(hnRoot, NodeClass)
 
     # done
     return hnRoot
