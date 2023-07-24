@@ -3,6 +3,7 @@ import struct
 from .helpers import *
 
 GFH_HEADER_MAGIC = b'MMM'
+GFH_HEADER_MAGIC_ENDER = b'EEEE' # seems to mark the end of the header list
 
 SIG_TYPE_5_MAGIC = b'\x58\xf3\x91\xe2'
 
@@ -240,8 +241,10 @@ def gfh_brom_cfg(fp):
     tagUint32(fp, 'cfg_bits', comment)
 
     tagUint32(fp, 'usbdl_by_auto_detect_timeout_ms')
-    tag(fp, 0x45, 'unused')
-    tagUint8(fp, 'jump_bl_arm64')
+    tag(fp, 0x43, 'unused')
+    tagUint8(fp, 'unused_maybe_R')
+    tagUint8(fp, 'unused_maybe_U')
+    tagUint8(fp, 'jump_bl_arm64') # is 0x64 when jump 64
     tag(fp, 2, 'unused')
     tagUint32(fp, 'usbdl_by_kcol0_timeout_ms')
     tagUint32(fp, 'usbdl_by_flag_timeout_ms')
@@ -276,7 +279,8 @@ def gfh_brom_sec_cfg(fp):
         return '('+'|'.join(result)+')' if result else ''
     tagUint8(fp, 'cfg_bits', comment)
     tag(fp, 0x20, 'customer_name[0x20]')
-    tagUint32(fp, 'pad')
+    tag(fp, 3, 'padding')
+    tagUint32(fp, 'special') # if 0xC975E033 then USBDL is disabled
     length = fp.tell() - start
     print(f'[0x{start:X},0x{start+length:X}) struct gfh_brom_sec_cfg')
 
