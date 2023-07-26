@@ -26,6 +26,13 @@ class AvbAlgorithmType(enum.Enum):
     SHA512_RSA4096 = 5
     SHA512_RSA8192 = 6
 
+class AvbDescriptorTag(enum.Enum):
+    AVB_DESCRIPTOR_TAG_PROPERTY = 0
+    AVB_DESCRIPTOR_TAG_HASHTREE = 1
+    AVB_DESCRIPTOR_TAG_HASH = 2
+    AVB_DESCRIPTOR_TAG_KERNEL_CMDLINE = 3
+    AVB_DESCRIPTOR_TAG_CHAIN_PARTITION = 4
+
 class AvbVBMetaImageFlags(enum.Enum):
     AVB_VBMETA_IMAGE_FLAGS_HASHTREE_DISABLED = 1
     AVB_VBMETA_IMAGE_FLAGS_VERIFICATION_DISABLED = 2
@@ -45,11 +52,11 @@ def AvbVBMetaImageHeader(fp):
 
     tagUint32(fp, 'algorithm_type', lambda x: enum_int_to_name(AvbAlgorithmType, x))
 
-    tagUint64(fp, 'hash_offset')
-    tagUint64(fp, 'hash_size')
+    hash_offset = tagUint64(fp, 'hash_offset')
+    hash_size = tagUint64(fp, 'hash_size')
 
-    tagUint64(fp, 'signature_offset')
-    tagUint64(fp, 'signature_size')
+    signature_offset = tagUint64(fp, 'signature_offset')
+    signature_size = tagUint64(fp, 'signature_size')
 
     public_key_offset = tagUint64(fp, 'public_key_offset')
     public_key_size = tagUint64(fp, 'public_key_size')
@@ -57,8 +64,8 @@ def AvbVBMetaImageHeader(fp):
     tagUint64(fp, 'public_key_metadata_offset')
     tagUint64(fp, 'public_key_metadata_size')
 
-    tagUint64(fp, 'descriptors_offset')
-    tagUint64(fp, 'descriptors_size')
+    descriptors_offset = tagUint64(fp, 'descriptors_offset')
+    descriptors_size = tagUint64(fp, 'descriptors_size')
 
     tagUint64(fp, 'rollback_index')
 
@@ -79,23 +86,50 @@ def AvbVBMetaImageHeader(fp):
         'authentication_data_block_size': authentication_data_block_size,
         'auxiliary_data_block_size': auxiliary_data_block_size,
         'public_key_offset': public_key_offset,
-        'public_key_size': public_key_size
+        'public_key_size': public_key_size,
+        'hash_offset': hash_offset,
+        'hash_size': hash_size,
+        'signature_offset': signature_offset,
+        'signature_size': signature_size,
+        'descriptors_offset': descriptors_offset,
+        'descriptors_size': descriptors_size
     }
 
 # * The "Authentication data" block is |authentication_data_block_size|
 # * bytes long and contains the hash and signature used to authenticate
 # * the vbmeta image. The type of the hash and signature is defined by
 # * the |algorithm_type| field.
-def AuthenticationData(fp, size):
+def AuthenticationData(fp, hdr):
     mark = fp.tell()
-    tag(fp, size, 'Authentication Data')
+
+    fp.seek(mark + hdr['hash_offset'])
+    tag(fp, hdr['hash_size'], 'hash')
+
+    fp.seek(mark + hdr['signature_offset'])
+    tag(fp, hdr['signature_size'], 'signature')
+
+    fp.seek(mark)
+    tag(fp, hdr['authentication_data_block_size'], 'Authentication Data')
 
 # * The "Auxiliary data" is |auxiliary_data_block_size| bytes long and
 # * contains the auxiliary data including the public key used to make
 # * the signature and descriptors.
-def AuxiliaryData(fp, size):
+def AuxiliaryData(fp, hdr):
     mark = fp.tell()
-    tag(fp, size, 'Auxiliary Data')
+
+    # parse the descriptors
+    descrs_length = hdr['descriptors_size']
+    descrs_start = mark + hdr['descriptors_offset']
+    fp.seek(descrs_start)
+    while fp.tell() - descrs_start < descrs_length:
+        avb_descriptor(fp)
+
+    # parse the public key
+    fp.seek(mark + hdr['public_key_offset'])
+    AvbRSAPublicKey(fp)
+
+    fp.seek(mark)
+    tag(fp, hdr['auxiliary_data_block_size'], 'Auxiliary Data')
 
 def AvbRSAPublicKeyHeader(fp):
     mark = fp.tell()
@@ -114,6 +148,7 @@ def AvbRSAPublicKeyHeader(fp):
 def AvbRSAPublicKey(fp):
     mark = fp.tell()
 
+    #breakpoint()
     hdr = AvbRSAPublicKeyHeader(fp)
 
     n_length = hdr['key_num_bits']//8
@@ -122,6 +157,30 @@ def AvbRSAPublicKey(fp):
 
     fp.seek(mark)
     tag(fp, 8 + 2*n_length, 'AvbRSAPublicKey')
+
+def AvbDescriptor(fp):
+    mark = fp.tell()
+
+    tag_ = tagUint64(fp, 'tag', lambda x: enum_int_to_name(AvbDescriptorTag, x))
+    num_bytes_following = tagUint64(fp, 'num_bytes_following')
+
+    fp.seek(mark)
+    tag(fp, 2*8, 'AvbDescriptor')
+
+    return {
+        'tag': tag_,
+        'num_bytes_following': num_bytes_following
+    }
+
+def avb_descriptor(fp):
+    mark = fp.tell()
+
+    info = AvbDescriptor(fp)
+
+    tag(fp, info['num_bytes_following'], f'data[{info["num_bytes_following"]}]')
+
+    fp.seek(mark)
+    tag(fp, 2*8 + info['num_bytes_following'], 'descriptor')
 
 ###############################################################################
 # "main"
@@ -134,10 +193,14 @@ def analyze(fp):
     hdr = AvbVBMetaImageHeader(fp)
 
     o_auth = fp.tell()
-    AuthenticationData(fp, hdr['authentication_data_block_size'])
+    AuthenticationData(fp, hdr)
 
     o_aux = fp.tell()
-    AuxiliaryData(fp, hdr['auxiliary_data_block_size'])
+    AuxiliaryData(fp, hdr)
+
+    if hdr['hash_offset'] and hdr['hash_size']:
+        fp.seek(o_auth + hdr['hash_offset'])
+        tag(fp, hdr['hash_size'], 'hash')
 
     if hdr['public_key_offset'] and hdr['public_key_size']:
         fp.seek(o_aux + hdr['public_key_offset'])
