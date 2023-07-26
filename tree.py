@@ -8,7 +8,7 @@ def print_recur(hnode, depth=0):
 
     length = hnode.end - hnode.begin
     lengthStr = '%d'%length if length < 16 else '0x%X'%length
-    print('[%08X, %08X) %s(%s) %s' % (hnode.begin, hnode.end, indent, lengthStr, hnode.data))
+    print('[%08X, %08X) %s(len=%s type=%s) %s' % (hnode.begin, hnode.end, indent, lengthStr, hnode.type_, hnode.comment))
 
     for child in sorted(hnode.children, key=lambda x: x.begin):
         print_recur(child, depth+1)

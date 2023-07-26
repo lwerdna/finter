@@ -32,30 +32,30 @@ def intervals_from_text(lines):
         if not line:
             continue
 
-        m = re.match(r'\[(.*?),(.*?)\) (.*)', line)
+        m = re.match(r'\[(.*?),(.*?)\) (.*?) (.*)', line)
         if not m:
             raise Exception('MALFORMED: %s' % line)
 
-        # Interval .begin .end .data
-        i = Interval(int(m.group(1),16), int(m.group(2),16), m.group(3))
+        # Interval .begin .end .type .comment
+        begin = int(m.group(1), 16)
+        end = int(m.group(2), 16)
+        type_ = m.group(3)
+        comment = m.group(4)
+
+        ibaggage = (type_, comment)
+
+        i = Interval(begin, end, ibaggage)
         intervals.append(i)
 
     return intervals
 
-def interval_fragments(start, end, intervals):
-    """ given [start,end) and intervals, return list of unclaimed intervals """
-    frag_tree = IntervalTree()
-    frag_tree.add(Interval(start, end, 'fragment'))
-    for i in intervals:
-        frag_tree.chop(i.begin, i.end)
-    return list(frag_tree)
-
 # minimum idea of "node"
 class FinterNode():
-    def __init__(self, begin, end, data):
+    def __init__(self, begin, end, type_, comment):
         self.begin = begin
         self.end = end
-        self.data = data
+        self.type_ = type_
+        self.comment = comment
         self.children = []
         self.parent = None
 
@@ -66,7 +66,7 @@ class FinterNode():
             result += c.__str__(depth+1)
         return result
 
-def create_fragments(node, NodeClass=FinterNode):
+def sort_and_create_fragments(node, NodeClass=FinterNode):
     result = []
 
     if not node.children:
@@ -76,7 +76,7 @@ def create_fragments(node, NodeClass=FinterNode):
     current = node.begin
     for child in sorted(node.children, key=lambda ch: ch.begin):
         if current < child.begin:
-            frag = NodeClass(current, child.begin, 'fragment')
+            frag = NodeClass(current, child.begin, 'raw', 'fragment')
             frag.parent = node
             result.append(frag)
         result.append(child)
@@ -84,7 +84,7 @@ def create_fragments(node, NodeClass=FinterNode):
 
     # fill possible gap after last child
     if current != node.end:
-        frag = NodeClass(current, node.end, 'fragment')
+        frag = NodeClass(current, node.end, 'raw', 'fragment')
         frag.parent = node
         result.append(frag)
 
@@ -93,7 +93,7 @@ def create_fragments(node, NodeClass=FinterNode):
 
     # recur on children
     for child in node.children:
-        create_fragments(child, NodeClass)
+        sort_and_create_fragments(child, NodeClass)
 
 def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
     """ convert IntervalTree to a hierarchy """
@@ -115,8 +115,8 @@ def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
                 child2parent[c] = min(child2parent[c], parent, key=lambda x: x.length())
 
     # wrap the child2parent relationships
-    hnRoot = NodeClass(tree.begin(), tree.end(), "root")
-    interval_to_node = { x:NodeClass(x.begin, x.end, x.data) for x in tree }
+    hnRoot = NodeClass(tree.begin(), tree.end(), 'none', 'root')
+    interval_to_node = { i:NodeClass(i.begin, i.end, i.data[0], i.data[1]) for i in tree }
 
     for (child, parent) in child2parent.items():
         hnChild = interval_to_node[child]
@@ -129,7 +129,7 @@ def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
             hnParent.children.append(hnChild)
 
     # create fragments
-    create_fragments(hnRoot, NodeClass)
+    sort_and_create_fragments(hnRoot, NodeClass)
 
     # done
     return hnRoot
@@ -210,8 +210,4 @@ def dissect_file(fpath, populate_fragments=True):
     lines = lines.split('\n')
     intervals = intervals_from_text(lines)
 
-    fragments = []
-    if populate_fragments:
-        fragments = interval_fragments(0, fsize, intervals)
-
-    return IntervalTree(intervals + fragments)    
+    return IntervalTree(intervals)    
