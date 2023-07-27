@@ -1,28 +1,18 @@
 #!/usr/bin/env python3
 #
-# dump a given file's tagging as json
+# dump a given file as python code that would read the same from the file
 
 import re
 import sys
-import json
 import struct
 import binascii
 
 from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode, finter_type_to_struct_fmt
 
-# we'll augment the default node type with the ability to produce a python
-# data structure serializable to json
-class JsonNode(FinterNode):
+class MyNode(FinterNode):
     def __init__(self, begin, end, type_, comment):
         super().__init__(begin, end, type_, comment)
-
-        # generate a name based on our comment, eg:
-        # comment                                      name
-        # -------                                      ----
-        # "public_key_size=0x408"                      "public_key_size"
-        # "tag=0x4 AVB_DESCRIPTOR_TAG_CHAIN_PARTITION" "tag"
-        # "data[1128]"                                 "data"
-        self.name = re.split('[^a-zA-Z0-9_]', self.comment)[0]
+        self.name = re.split('[^0-9a-zA-Z_]', self.comment)[0]
 
         # needed
         self.fp = None
@@ -32,7 +22,9 @@ class JsonNode(FinterNode):
         for child in self.children:
             child.set_fp(fp)
 
-    def data_structify(self):
+    def go(self, comma=False, depth=0):
+        indent = '    '*depth
+
         # if we have child children, do not emit our "value" (the bytes we tag)
         # instead, return a dict with named children
         if self.children:
@@ -51,21 +43,26 @@ class JsonNode(FinterNode):
                         ch.name = f'{ch.name}0'
                         suffix[name] = 1
 
-            # make the data structure recursively
-            return { ch.name : ch.data_structify() for ch in self.children }
+            # print recursively
+            print(f'{indent}\'{self.name}\': ' + '{')
+            for i,ch in enumerate(self.children):
+                last = (i == len(self.children)-1)
+                ch.go(not last, depth+1)
+            print(f'{indent}' + '}' + (',' if comma else ''))
 
-        # we have no children: emit our tagged bytes in serialized form
+        # we have no children: emit code to read ourselves from file pointer
         else:
             self.fp.seek(self.begin)
             data = self.fp.read(self.end - self.begin)
+            extra = ',' if comma else ''
 
             match self.type_:
-                case 'raw': return binascii.hexlify(data).decode('utf-8')
-                case 'none': return 'null'
+                case 'none': print(f'{indent}\'{self.name}\' = null' + extra)
+                case 'raw':
+                    print(f'{indent}\'{self.name}\': slurp(0x{self.begin:X}, 0x{self.end:X}, \'raw\'){extra}')
                 case _:
                     fmt = finter_type_to_struct_fmt(self.type_)
-                    return struct.unpack(fmt, data)[0]
-
+                    print(f'{indent}\'{self.name}\': slurp(0x{self.begin:X}, 0x{self.end:X}, \'{fmt}\'){extra}')
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -77,7 +74,7 @@ if __name__ == '__main__':
 
     interval_tree = dissect_file(fpath)
 
-    root = interval_tree_to_hierarchy(interval_tree, JsonNode)
+    root = interval_tree_to_hierarchy(interval_tree, MyNode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 
@@ -86,7 +83,22 @@ if __name__ == '__main__':
         graph(root)
         sys.exit(-1)
 
+    print('''
+def read(fp):
+    def slurp(begin, end, fmt):
+        fp.seek(begin)
+        data = fp.read(end-begin)
+        match fmt:
+            case 'raw': return data
+            case 'none': return None
+            case _: return struct.unpack(fmt, data)[0]
+''')
+
     with open(sys.argv[1], 'rb') as fp:
         root.set_fp(fp)
-        ds = root.data_structify()
-        print(json.dumps(ds, indent=4))
+
+        print('    return {')
+        for i,ch in enumerate(root.children):
+            last = i == len(root.children)-1
+            ch.go(not last, 2)
+        print('    }')

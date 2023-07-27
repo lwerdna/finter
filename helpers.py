@@ -188,7 +188,7 @@ def dissect_file(fpath, populate_fragments=True):
     analyze = find_dissector(fpath)
     if not analyze:
         return
-    
+
     fsize = os.path.getsize(fpath)
 
     # capture stdout to StringIO
@@ -196,7 +196,7 @@ def dissect_file(fpath, populate_fragments=True):
     old_stdout = sys.stdout
     sys.stdout = buf
 
-    # call analyzer 
+    # call analyzer
     lines = ''
     with open(fpath, 'rb') as fp:
         analyze(fp)
@@ -210,4 +210,9 @@ def dissect_file(fpath, populate_fragments=True):
     lines = lines.split('\n')
     intervals = intervals_from_text(lines)
 
-    return IntervalTree(intervals)    
+    return IntervalTree(intervals)
+
+def finter_type_to_struct_fmt(type_):
+    # currently they're 1:1
+    assert type_ in {'B', '<B', '>B', 'H', '<H', '>H', 'W', '<W', '>W', 'I', '<I', '>I', 'Q', '<Q', '>Q'}
+    return type_
