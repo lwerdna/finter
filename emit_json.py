@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# dump a given file as json
+# dump a given file's tagging as json
 
 import re
 import sys
@@ -33,25 +33,26 @@ class JsonNode(FinterNode):
             child.set_fp(fp)
 
     def data_structify(self):
-        if self.name == 'key_num_bits':
-            breakpoint()
-
         # if we have child children, do not emit our "value" (the bytes we tag)
         # instead, return a dict with named children
         if self.children:
             # get the requested names of each child
             names = [ch.name for ch in self.children]
 
+            #if 'descriptor' in names:
+            #    breakpoint()
+
             # resolve conflicts by appending a numeric distinguisher
             suffix = {}
             for ch in self.children:
-                if names.count(ch.name) > 1:
-                    if ch.name in suffix:
+                name = ch.name
+                if names.count(name) > 1:
+                    if name in suffix:
                         ch.name = f'{ch.name}{suffix[ch.name]}'
-                        suffix[ch.name] += 1
+                        suffix[name] += 1
                     else:
                         ch.name = f'{ch.name}0'
-                        suffix[ch.name] = 1
+                        suffix[name] = 1
             
             # make the data structure recursively
             return { ch.name : ch.data_structify() for ch in self.children }
