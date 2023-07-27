@@ -197,13 +197,3 @@ def analyze(fp):
 
     o_aux = fp.tell()
     AuxiliaryData(fp, hdr)
-
-    if hdr['hash_offset'] and hdr['hash_size']:
-        fp.seek(o_auth + hdr['hash_offset'])
-        tag(fp, hdr['hash_size'], 'hash')
-
-    if hdr['public_key_offset'] and hdr['public_key_size']:
-        fp.seek(o_aux + hdr['public_key_offset'])
-        AvbRSAPublicKey(fp)
-        #tag(fp, hdr['public_key_size'], 'public key')
-
