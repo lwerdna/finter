@@ -4,7 +4,7 @@
 
 import re
 import sys
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy
+from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -14,27 +14,26 @@ YELLOW = '\x1B[93m'
 CYAN = '\x1B[96m'
 NORMAL = '\x1B[0m'
 
-class OhaNode():
-    def __init__(self, begin, end, comment):
-        self.begin = begin
-        self.end = end
-        self.comment = comment
-        self.children = []
-        self.parent = None
+# OHANode extends FinterNode by:
+# - adding .fp member variable to access bytes tagged
+# - adding .pretty_print() methods to output the offset, hex, ascii
+class OHANode(FinterNode):
+    def __init__(self, begin, end, type_, comment):
+        super().__init__(begin, end, type_, comment)
         self.fp = None
 
-    def setfp(self, fp):
+    def set_fp(self, fp):
         self.fp = fp
         for child in self.children:
-            child.setfp(fp)
+            child.set_fp(fp)
 
-    def pprint(self, depth=0):
+    def pretty_print(self, depth=0):
         comment = '  '*depth + self.comment
 
         if self.children:
             oha_comment(self.begin, comment)
             for child in sorted(self.children, key=lambda c: c.begin):
-                child.pprint(depth+1)
+                child.pretty_print(depth+1)
         else:
             data = self.fp.read(self.end - self.begin)
             oha(data, self.begin, comment)
@@ -98,7 +97,7 @@ if __name__ == '__main__':
 
     interval_tree = dissect_file(fpath)
 
-    root = interval_tree_to_hierarchy(interval_tree, OhaNode)
+    root = interval_tree_to_hierarchy(interval_tree, OHANode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 
@@ -108,8 +107,8 @@ if __name__ == '__main__':
         sys.exit(-1)
 
     with open(sys.argv[1], 'rb') as fp:
-        root.setfp(fp)
+        root.set_fp(fp)
 
         for child in sorted_children:
-            child.pprint()
+            child.pretty_print()
 
