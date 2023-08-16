@@ -210,6 +210,9 @@ def dissect_file(fpath, populate_fragments=True):
     lines = lines.split('\n')
     intervals = intervals_from_text(lines)
 
+    # filter out null intervals
+    intervals = [i for i in intervals if i.length()]
+
     return IntervalTree(intervals)
 
 def finter_type_to_struct_fmt(type_):
