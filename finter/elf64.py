@@ -8,6 +8,44 @@ from . import dwarf
 from .elf import *
 from .helpers import *
 
+#define ELF64_R_SYM(i)			((i) >> 32)
+def ELF64_R_SYM(i):
+    return i >> 32
+
+#define ELF64_R_TYPE(i)			((i) & 0xffffffff)
+def ELF64_R_TYPE(i):
+    return i & 0xFFFFFFFF
+
+# typedef struct
+# {
+#     Elf64_Addr	r_offset;		/* Address */
+#     Elf64_Xword	r_info;			/* Relocation type and symbol index */
+#     Elf64_Sxword	r_addend;		/* Addend */
+# } Elf64_Rela;
+def tag_elf64_rela(fp, machine:E_MACHINE=None):
+    tag(fp, 24, 'Elf64_Rela', True)
+    tagUint64(fp, 'r_offset')
+
+    # info is type.24|id.8
+    r_info = uint64(fp, True)
+
+    # this way? with ELF64_R_TYPE_DATA() and ELF64_R_TYPE_ID()
+    if 0:
+        data = (r_info & 0xFFFFFF00) >> 8
+        id_ = r_info & 0xFF
+        tagUint64(fp, 'r_info', f'data=0x{data:X} id=0x{id_:X}')
+    # or this? with ELF64_R_SYM() and ELF64_R_TYPE()
+    if 1:
+        r_sym = ELF64_R_SYM(r_info)
+        r_type = ELF64_R_TYPE(r_info)
+        r_type_str = ''
+        if machine == E_MACHINE.EM_AARCH64.value:
+            r_type_str = ' (' + RELOC_TYPE_ARM64(r_type).name + ')'
+        tagUint64(fp, 'r_info', f'sym=0x{r_sym:X} type=0x{r_type:X}{r_type_str}')
+
+    tagInt64(fp, 'r_addend')
+
+
 ###############################################################################
 # "main"
 ###############################################################################
@@ -60,6 +98,7 @@ def analyze(fp):
     strtab = None
     debug_info = None
     debug_abbrev = None
+    rela_sections = []
     fp.seek(e_shoff)
     for i in range(e_shnum):
         oHdr = fp.tell()
@@ -94,6 +133,8 @@ def analyze(fp):
             debug_info = [sh_offset, sh_size]
         if strName == '.debug_abbrev':
             debug_abbrev = [sh_offset, sh_size]
+        if sh_type == SHT_RELA:
+            rela_sections.append((sh_offset, sh_size))
 
         print('[0x%X,0x%X) raw elf64_shdr "%s" %s' % \
             (oHdr, fp.tell(), scnStrTab[sh_name], strType))
@@ -193,6 +234,11 @@ def analyze(fp):
         [scn_addr, scn_sz] = debug_abbrev
         fp.seek(scn_addr)
         dwarf.tag_debug_abbrev(fp, scn_addr, scn_sz)
+
+    for (addr, size) in rela_sections:
+        fp.seek(addr)
+        while fp.tell() < addr + size:
+            tag_elf64_rela(fp, e_machine)
 
     # read program headers
     # REMINDER! struct member 'p_flags' changes between 32/64 bits

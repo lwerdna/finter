@@ -283,6 +283,13 @@ def tagUint64(FP, name, comment='', peek=0):
     print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+8, fmtu64, name, val, comment))
     return val
 
+def tagInt64(FP, name, comment='', peek=0):
+    pos = FP.tell()
+    val = int64(FP, peek)
+    if type(comment) == types.FunctionType: comment = comment(val)
+    print('[0x%X,0x%X) %s %s=%d %s' % (pos, pos+8, fmt64, name, val, comment))
+    return val
+
 def tagUleb128(FP, name, comment='', peek=0):
     pos = FP.tell()
     (val, length) = uleb128(FP, peek)
