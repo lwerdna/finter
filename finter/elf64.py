@@ -95,11 +95,11 @@ def analyze(fp):
         if strName == '.debug_abbrev':
             debug_abbrev = [sh_offset, sh_size]
 
-        print('[0x%X,0x%X) elf64_shdr "%s" %s' % \
+        print('[0x%X,0x%X) raw elf64_shdr "%s" %s' % \
             (oHdr, fp.tell(), scnStrTab[sh_name], strType))
 
         if(not sh_type in [SHT_NULL, SHT_NOBITS]):
-            print('[0x%X,0x%X) section "%s" contents' % \
+            print('[0x%X,0x%X) raw section "%s" contents' % \
                 (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
 
     # certain sections we analyze deeper...
@@ -210,7 +210,7 @@ def analyze(fp):
         tagUint64(fp, 'p_memsz')
         tagUint64(fp, 'p_align')
 
-        print('[0x%X,0x%X) elf64_phdr index=%d' % \
+        print('[0x%X,0x%X) raw elf64_phdr index=%d' % \
             (oHdr, fp.tell(), i))
 
 if __name__ == '__main__':

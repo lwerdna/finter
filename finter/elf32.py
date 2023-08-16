@@ -73,16 +73,16 @@ def tag_elf32_sym(fp, index, strTab:StringTable):
     fp.seek(base)
     tag(fp, SIZE_ELF32_SYM, "Elf32_Sym \"%s\" (index:%d)" % (nameStr, index))
 
-def tag_elf32_dyn(fp):
+def tag_elf32_dyn(fp, e_machine):
     base = fp.tell()
     d_tag = uint32(fp, 1)
-    tagStr = dynamic_type_tostr(d_tag)
+    tagStr = dynamic_type_tostr(d_tag, e_machine)
     tag(fp, 4, "d_tag:0x%X (%s)" % (d_tag, tagStr))
     tagUint32(fp, "val_ptr")
     fp.seek(base)
     tag(fp, SIZE_ELF32_DYN, "Elf32_Dyn (%s)" % tagStr)
 
-    if d_tag == DT_NULL:
+    if d_tag == DynamicType.DT_NULL:
         return 'quit'
 
 def tag_elf32_shdr(fp, index, scnStrTab):
@@ -176,7 +176,7 @@ def analyze(fp):
     for (i,info) in enumerate(scn_infos):
         # top level container
         if not info['sh_type'] in [SHT_NULL, SHT_NOBITS] and info['sh_size'] > 0:
-            print('[0x%X,0x%X) section "%s" contents' % \
+            print('[0x%X,0x%X) raw section "%s" contents' % \
                 (info['sh_offset'], info['sh_offset']+info['sh_size'], scnStrTab[info['sh_name']]))
 
         # like .dynamic
@@ -184,7 +184,7 @@ def analyze(fp):
             # array of Elf32_Dyn entries
             fp.seek(info['sh_offset'])
             while fp.tell() < (info['sh_offset'] + info['sh_size']):
-                if tag_elf32_dyn(fp) == 'quit':
+                if tag_elf32_dyn(fp, e_machine) == 'quit':
                     break
 
         # like .dynsym
@@ -230,7 +230,7 @@ def analyze(fp):
         tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
         tagUint32(fp, "p_align")
 
-        print('[0x%X,0x%X) elf32_phdr index=%d' % \
+        print('[0x%X,0x%X) raw elf32_phdr index=%d' % \
             (oHdr, fp.tell(), i))
 
 if __name__ == '__main__':

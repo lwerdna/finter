@@ -368,58 +368,77 @@ def phdr_flags_tostr(x):
     if x & PF_X: fstrs.append('PF_X')
     return '|'.join(fstrs)
 
-DT_NULL = 0
-DT_NEEDED = 1
-DT_PLTRELSZ = 2
-DT_PLTGOT = 3
-DT_HASH = 4
-DT_STRTAB = 5
-DT_SYMTAB = 6
-DT_RELA = 7
-DT_RELASZ = 8
-DT_RELAENT = 9
-DT_STRSZ = 10
-DT_SYMENT = 11
-DT_INIT = 12
-DT_FINI = 13
-DT_SONAME = 14
-DT_RPATH = 15
-DT_SYMBOLIC = 16
-DT_REL = 17
-DT_RELSZ = 18
-DT_RELENT = 19
-DT_PLTREL = 20
-DT_DEBUG = 21
-DT_TEXTREL = 22
-DT_JMPREL = 23
-DT_BIND_NOW = 24
-DT_INIT_ARRAY = 25
-DT_FINI_ARRAY = 26
-DT_INIT_ARRAYSZ = 27
-DT_FINI_ARRAYSZ = 28
+class DynamicType(Enum):
+    DT_NULL = 0
+    DT_NEEDED = 1
+    DT_PLTRELSZ = 2
+    DT_PLTGOT = 3
+    DT_HASH = 4
+    DT_STRTAB = 5
+    DT_SYMTAB = 6
+    DT_RELA = 7
+    DT_RELASZ = 8
+    DT_RELAENT = 9
+    DT_STRSZ = 10
+    DT_SYMENT = 11
+    DT_INIT = 12
+    DT_FINI = 13
+    DT_SONAME = 14
+    DT_RPATH = 15
+    DT_SYMBOLIC = 16
+    DT_REL = 17
+    DT_RELSZ = 18
+    DT_RELENT = 19
+    DT_PLTREL = 20
+    DT_DEBUG = 21
+    DT_TEXTREL = 22
+    DT_JMPREL = 23
+    DT_BIND_NOW = 24
+    DT_INIT_ARRAY = 25
+    DT_FINI_ARRAY = 26
+    DT_INIT_ARRAYSZ = 27
+    DT_FINI_ARRAYSZ = 28
+
 DT_LOOS = 0x60000000
 DT_HIOS = 0x6FFFFFFF
 DT_LOPROC = 0x70000000
 DT_HIPROC = 0x7FFFFFFF
-def dynamic_type_tostr(x):
-    lookup = { DT_NULL:"NULL", DT_NEEDED:"NEEDED", DT_PLTRELSZ:"PLTRELSZ",
-        DT_PLTGOT:"PLTGOT", DT_HASH:"HASH", DT_STRTAB:"STRTAB",
-        DT_SYMTAB:"SYMTAB", DT_RELA:"RELA", DT_RELASZ:"RELASZ",
-        DT_RELAENT:"RELAENT", DT_STRSZ:"STRSZ", DT_SYMENT:"SYMENT",
-        DT_INIT:"INIT", DT_FINI:"FINI", DT_SONAME:"SONAME",
-        DT_RPATH:"RPATH", DT_SYMBOLIC:"SYMBOLIC", DT_REL:"REL",
-        DT_RELSZ:"RELSZ", DT_RELENT:"RELENT", DT_PLTREL:"PLTREL",
-        DT_DEBUG:"DEBUG", DT_TEXTREL:"TEXTREL", DT_JMPREL:"JMPREL",
-        DT_BIND_NOW:"BIND_NOW", DT_INIT_ARRAY:"INIT_ARRAY", DT_FINI_ARRAY:"FINI_ARRAY",
-        DT_INIT_ARRAYSZ:"INIT_ARRAYSZ", DT_FINI_ARRAYSZ:"FINI_ARRAYSZ"
-    }
-    if x in lookup:
-        return lookup[x]
+
+# if machine type MIPS, these are allocated from the [DT_LOCPROC, DT_HIPROC] range
+class DynamicTypeMips(Enum):
+    DT_MIPS_RLD_VERSION = 0x70000001
+    DT_MIPS_TIME_STAMP = 0x70000002
+    DT_MIPS_ICHECKSUM = 0x70000003
+    DT_MIPS_IVERSION = 0x70000004
+    DT_MIPS_FLAGS = 0x70000005
+    DT_MIPS_BASE_ADDRESS = 0x70000006
+    # DT_??? = 0x70000007
+    DT_MIPS_CONFLICT = 0x70000008
+    DT_MIPS_LIBLIST = 0x70000009
+    DT_MIPS_LOCAL_GOTNO = 0x7000000A
+    DT_MIPS_CONFLICTNO = 0x7000000B
+    DT_MIPS_LIBLISTNO = 0x70000010
+    DT_MIPS_SYMTABNO = 0x70000011
+    DT_MIPS_UNREFEXTNO = 0x70000012
+    DT_MIPS_GOTSYM = 0x70000013
+    DT_MIPS_HIPAGENO = 0x70000014
+    DT_MIPS_RLD_MAP = 0x70000016
+
+def dynamic_type_tostr(x, e_machine=None):
+    if any(elem.value == x for elem in DynamicType):
+        return DynamicType(x).name
+
     if x >= DT_LOOS and x <= DT_HIOS:
-        return "OS"
+        return "unknown [DT_LOOS, DT_HIOS]"
+
     if x >= DT_LOPROC and x <= DT_HIPROC:
-        return "PROC"
-    return 'UNKNOWN'
+        if e_machine in {E_MACHINE.EM_MIPS.value, E_MACHINE.EM_MIPS_X.value, E_MACHINE.EM_MIPS_RS3_LE.value}:
+            if any(elem.value == x for elem in DynamicTypeMips):
+                return DynamicTypeMips(x).name
+
+        return "unknown [DT_LOPROC, DT_HIPROC]"
+
+    return 'unknown'
 
 # symbol bindings
 STB_LOCAL = 0
