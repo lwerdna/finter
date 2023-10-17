@@ -166,8 +166,8 @@ class DWARF_ATTR_ENCODING(Enum):
     DW_AT_const_expr = 0x6c
     DW_AT_enum_class = 0x6d
     DW_AT_linkage_name = 0x6e
-    #DW_AT_lo_user = 0x2000
-    #DW_AT_hi_user = 0x3fff
+    DW_AT_lo_user = 0x2000
+    DW_AT_hi_user = 0x3fff
 
 class DWARF_ATTR_FORM(Enum):
     DW_FORM_null = 0x00
@@ -227,7 +227,17 @@ def tag_debug_abbrev(fp):
 
 def tag_attr_spec(fp):
     base = fp.tell()
-    name = tagUleb128(fp, 'attr_name', lambda x: '(%s)' % DWARF_ATTR_ENCODING(x).name)
+
+    def make_name(x):
+        if x >= DWARF_ATTR_ENCODING.DW_AT_lo_user.value and x <= DWARF_ATTR_ENCODING.DW_AT_hi_user.value:
+            return f'DW_AT_lo_user + 0x{x - DWARF_ATTR_ENCODING.DW_AT_lo_user.value:X}'
+        elif not any(e.value == x for e in DWARF_ATTR_ENCODING):
+            return f'DWARF_ATTR_ENCODING.unknown'
+        else:
+            return '(%s)' % DWARF_ATTR_ENCODING(x).name
+
+    name = tagUleb128(fp, 'attr_name', make_name)
+
     form = tagUleb128(fp, 'attrib_form', lambda x: '(%s)' % DWARF_ATTR_FORM(x).name)
 
     length = fp.tell() - base

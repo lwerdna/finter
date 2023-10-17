@@ -16,6 +16,12 @@ def ELF64_R_SYM(i):
 def ELF64_R_TYPE(i):
     return i & 0xFFFFFFFF
 
+def ELF64_ST_BIND(info):
+    return info >> 4
+
+def ELF64_ST_TYPE(info):
+    return info & 0xf
+
 # typedef struct
 # {
 #     Elf64_Addr	r_offset;		/* Address */
@@ -162,7 +168,7 @@ def analyze(fp):
             fp.seek(tmp)
             tag(fp, SIZE_ELF64_DYN, "Elf64_Dyn (%s)" % tagStr)
 
-            if d_tag == DT_NULL:
+            if d_tag == DynamicType.DT_NULL:
                 break
 
     symtab_name2addr = {}
@@ -178,8 +184,8 @@ def analyze(fp):
             nameStr = strTab[st_name]
             tag(fp, 4, "st_name=0x%X \"%s\"" % (st_name,nameStr))
             st_info = uint8(fp, 1)
-            bindingStr = symbol_binding_tostr(st_info >> 4)
-            typeStr = symbol_type_tostr(st_info & 0xF)
+            bindingStr = symbol_binding_tostr(ELF64_ST_BIND(st_info))
+            typeStr = symbol_type_tostr(ELF64_ST_TYPE(st_info))
             tag(fp, 1, "st_info bind:%d(%s) type:%d(%s)" % \
                 (st_info>>4, bindingStr, st_info&0xF, typeStr))
             st_other = tagUint8(fp, "st_other")
