@@ -82,8 +82,7 @@ def tag_elf32_dyn(fp, e_machine):
     fp.seek(base)
     tag(fp, SIZE_ELF32_DYN, "Elf32_Dyn (%s)" % tagStr)
 
-    if d_tag == DynamicType.DT_NULL:
-        return 'quit'
+    return d_tag != DynamicType.DT_NULL
 
 def tag_elf32_shdr(fp, index, scnStrTab):
     base = fp.tell()
@@ -117,6 +116,32 @@ def tag_elf32_shdr(fp, index, scnStrTab):
             'sh_info':sh_info,
             'sh_addralign':sh_addralign,
             'sh_entsize':sh_entsize}
+
+def tag_elf32_phdr(fp, index):
+    base = fp.tell()
+
+    p_type = uint32(fp, True)
+    tagUint32(fp, 'p_type', '('+phdr_type_tostr(p_type)+')')
+    p_offset = tagUint32(fp, "p_offset")
+    p_vaddr = tagUint32(fp, "p_vaddr")
+    p_paddr = tagUint32(fp, "p_paddr")
+    p_filesz = tagUint32(fp, "p_filesz")
+    p_memsz = tagUint32(fp, "p_memsz")
+    p_flags = uint32(fp, True)
+    tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
+    p_align = tagUint32(fp, "p_align")
+
+    print('[0x%X,0x%X) raw elf32_phdr index=%d' % \
+        (base, fp.tell(), index))
+
+    return {    'p_type':p_type,
+                'p_offset':p_offset,
+                'p_vaddr':p_vaddr,
+                'p_paddr':p_paddr,
+                'p_filesz':p_filesz,
+                'p_memsz':p_memsz,
+                'p_flags':p_flags,
+                'p_align':p_align   }
 
 def analyze(fp):
     if not isElf32(fp):
@@ -173,7 +198,7 @@ def analyze(fp):
         scn_infos.append(info)
 
     # tag section contents
-    for (i,info) in enumerate(scn_infos):
+    for i, info in enumerate(scn_infos):
         # top level container
         if not info['sh_type'] in [SHT_NULL, SHT_NOBITS] and info['sh_size'] > 0:
             print('[0x%X,0x%X) raw section "%s" contents' % \
@@ -184,7 +209,7 @@ def analyze(fp):
             # array of Elf32_Dyn entries
             fp.seek(info['sh_offset'])
             while fp.tell() < (info['sh_offset'] + info['sh_size']):
-                if tag_elf32_dyn(fp, e_machine) == 'quit':
+                if not tag_elf32_dyn(fp, e_machine):
                     break
 
         # like .dynsym
@@ -217,21 +242,34 @@ def analyze(fp):
     # read program headers
     # REMINDER! struct member 'p_flags' changes between 32/64 bits
     fp.seek(e_phoff)
+    phdr_infos = []
     for i in range(e_phnum):
-        oHdr = fp.tell()
-        p_type = uint32(fp, True)
-        tagUint32(fp, 'p_type', '('+phdr_type_tostr(p_type)+')')
-        tagUint32(fp, "p_offset")
-        tagUint32(fp, "p_vaddr")
-        tagUint32(fp, "p_paddr")
-        tagUint32(fp, "p_filesz")
-        tagUint32(fp, "p_memsz")
-        p_flags = uint32(fp, True)
-        tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
-        tagUint32(fp, "p_align")
+        info:dict = tag_elf32_phdr(fp, i)
+        phdr_infos.append(info)
 
-        print('[0x%X,0x%X) raw elf32_phdr index=%d' % \
-            (oHdr, fp.tell(), i))
+    for i, info in enumerate(phdr_infos):
+        start = info['p_offset']
+        end = start + info['p_filesz']
+
+
+        # top level container
+        if not (start and end):
+            continue
+
+        type_str = phdr_type_tostr(info['p_type'])
+
+        print('[0x%X,0x%X) raw segment idx:%d type:%s' % \
+            (start, end, i, type_str))
+
+        # If a dynamic program header / segment exists, but it wasn't tagged in a section,
+        # tag it now. Some toolchains produce section-less binaries.
+        if info['p_type'] == PT_DYNAMIC:
+            if not [si for si in scn_infos if si['sh_type'] == SHT_DYNAMIC]:
+                fp.seek(start)
+
+                while fp.tell() < end:
+                    if not tag_elf32_dyn(fp, e_machine):
+                        break
 
 if __name__ == '__main__':
     with open(sys.argv[1], 'rb') as fp:
