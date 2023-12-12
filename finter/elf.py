@@ -237,6 +237,7 @@ class E_MACHINE(Enum):
     EM_AMDGPU = 224    #  AMD GPU
     EM_RISCV = 243    #  RISC-V
     EM_BPF = 247    #  Linux BPF -- in-kernel virtual machine
+    EM_NANOMIPS = 249
     EM_CSKY = 252     #  C-SKY
 
 def e_machine_tostr(em):

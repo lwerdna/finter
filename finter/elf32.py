@@ -151,7 +151,7 @@ def analyze(fp):
     tagUint16(fp, "e_phentsize")
     e_phnum = tagUint16(fp, "e_phnum")
     e_shentsize = tagUint16(fp, "e_shentsize")
-    assert(e_shentsize == SIZE_ELF32_SHDR)
+    assert(e_shentsize == 0 or e_shentsize == SIZE_ELF32_SHDR)
     e_shnum = tagUint16(fp, "e_shnum")
     e_shstrndx = tagUint16(fp, "e_shstrndx")
 

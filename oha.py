@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
 # display given file as offset, hex, ascii (OHA)
 
