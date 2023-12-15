@@ -51,6 +51,96 @@ def tag_elf64_rela(fp, machine:E_MACHINE=None):
 
     tagInt64(fp, 'r_addend')
 
+# typedef struct {
+#         Elf64_Xword d_tag;
+#         union {
+#                 Elf64_Xword     d_val;
+#                 Elf64_Addr      d_ptr;
+#         } d_un;
+# } Elf64_Dyn;
+def tag_elf64_dyn(fp, e_machine):
+    base = fp.tell()
+    # tag d_tag
+    d_tag = uint64(fp, 1)
+    tag(fp, 8, "d_tag:0x%X (%s)" % (d_tag, dynamic_type_tostr(d_tag, e_machine)))
+    # tag d_val/d_ptr
+    d_val = tagUint64(fp, 'd_val')
+    # tag root struct
+    fp.seek(base)
+    tag(fp, SIZE_ELF64_DYN, "Elf64_Dyn (%s)" % tag)
+    # return
+    return d_tag != DynamicType.DT_NULL
+
+# typedef struct {
+#         Elf64_Word      sh_name;
+#         Elf64_Word      sh_type;
+#         Elf64_Xword     sh_flags;
+#         Elf64_Addr      sh_addr;
+#         Elf64_Off       sh_offset;
+#         Elf64_Xword     sh_size;
+#         Elf64_Word      sh_link;
+#         Elf64_Word      sh_info;
+#         Elf64_Xword     sh_addralign;
+#         Elf64_Xword     sh_entsize;
+# } Elf64_Shdr;
+def tag_elf64_shdr(fp, index, scnStrTab):
+    base = fp.tell()
+
+    sh_name = tagUint64(fp, "sh_name")
+    sh_type = uint64(fp, 1)
+    tag(fp, 4, "sh_type=0x%X (%s)" % \
+        (sh_type, sh_type_tostr(sh_type)))
+    sh_flags = uint64(fp, 1)
+    tag(fp, 4, "sh_flags=0x%X (%s)" % \
+        (sh_flags, sh_flags_tostr(sh_flags)))
+    sh_addr = tagUint64(fp, "sh_addr")
+    sh_offset = tagUint64(fp, "sh_offset")
+    sh_size = tagUint64(fp, "sh_size")
+    sh_link = tagUint64(fp, "sh_link") # usually the section index of the associated string or symbol table
+    sh_info = tagUint64(fp, "sh_info") # usually the section index of the section to which this applies
+    sh_addralign = tagUint64(fp, "sh_addralign")
+    sh_entsize = tagUint64(fp, "sh_entsize")
+
+    fp.seek(base)
+    tag(fp, SIZE_ELF64_SHDR, 'elf32_shdr "%s" %s (index: %d)' % \
+        (scnStrTab[sh_name], sh_type_tostr(sh_type), index))
+
+    return {'sh_name':sh_name,
+            'sh_type':sh_type,
+            'sh_flags':sh_flags,
+            'sh_addr':sh_addr,
+            'sh_offset':sh_offset,
+            'sh_size':sh_size,
+            'sh_link':sh_link,
+            'sh_info':sh_info,
+            'sh_addralign':sh_addralign,
+            'sh_entsize':sh_entsize}
+
+def tag_elf64_phdr(fp, index):
+    base = fp.tell()
+
+    p_type = uint32(fp, True)
+    tagUint32(fp, 'p_type', '('+phdr_type_tostr(p_type)+')')
+    p_flags = uint32(fp, True)
+    tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
+    p_offset = tagUint64(fp, 'p_offset')
+    p_vaddr = tagUint64(fp, 'p_vaddr')
+    p_paddr = tagUint64(fp, 'p_paddr')
+    p_filesz = tagUint64(fp, 'p_filesz')
+    p_memsz = tagUint64(fp, 'p_memsz')
+    p_align = tagUint64(fp, 'p_align')
+
+    print('[0x%X,0x%X) raw elf64_phdr index=%d' % \
+        (base, fp.tell(), index))
+
+    return {    'p_type':p_type,
+                'p_offset':p_offset,
+                'p_vaddr':p_vaddr,
+                'p_paddr':p_paddr,
+                'p_filesz':p_filesz,
+                'p_memsz':p_memsz,
+                'p_flags':p_flags,
+                'p_align':p_align   }
 
 ###############################################################################
 # "main"
@@ -98,33 +188,25 @@ def analyze(fp):
     fp.seek(sh_offset)
     scnStrTab = StringTable(fp, sh_size)
 
-    # read all section headers
+    # tag and save all section headers
+    fp.seek(e_shoff)
+    scn_infos = []
+    for i in range(e_shnum):
+        info:dict = tag_elf64_shdr(fp, i, scnStrTab)
+        scn_infos.append(info)
+
     dynamic = None
     symtab = None
     strtab = None
     debug_info = None
     debug_abbrev = None
     rela_sections = []
-    fp.seek(e_shoff)
-    for i in range(e_shnum):
-        oHdr = fp.tell()
-        sh_name = tagUint32(fp, "sh_name")
-        sh_type = uint32(fp, 1)
-        tag(fp, 4, "sh_type=0x%X (%s)" % \
-            (sh_type, sh_type_tostr(sh_type)))
-        sh_flags = uint64(fp, 1)
-        tag(fp, 8, "sh_flags=0x%X (%s)" % \
-            (sh_flags, sh_flags_tostr(sh_flags)))
-        sh_addr = tagUint64(fp, "sh_addr")
-        sh_offset = tagUint64(fp, "sh_offset")
-        sh_size = tagUint64(fp, "sh_size")
-        tagUint32(fp, "sh_link")
-        tagUint32(fp, "sh_info")
-        tagUint64(fp, "sh_addralign")
-        tagUint64(fp, "sh_entsize")
 
-        strType = sh_type_tostr(sh_type)
-        strName = scnStrTab[sh_name]
+    # tag section contents
+    for i, info in enumerate(scn_infos):
+        fp.seek(info['sh_offset'])
+
+        strName = scnStrTab[info['sh_name']]
 
         # store info on special sections
         if strName == '.dynamic':
@@ -142,10 +224,7 @@ def analyze(fp):
         if sh_type == SHT_RELA:
             rela_sections.append((sh_offset, sh_size))
 
-        print('[0x%X,0x%X) raw elf64_shdr "%s" %s' % \
-            (oHdr, fp.tell(), scnStrTab[sh_name], strType))
-
-        if(not sh_type in [SHT_NULL, SHT_NOBITS]):
+        if (not sh_type in [SHT_NULL, SHT_NOBITS]):
             print('[0x%X,0x%X) raw section "%s" contents' % \
                 (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
 
@@ -160,16 +239,8 @@ def analyze(fp):
         [offs,size] = dynamic
         fp.seek(offs)
         while fp.tell() < (offs + size):
-            tmp = fp.tell()
-            d_tag = uint64(fp, 1)
-            tagStr = dynamic_type_tostr(d_tag)
-            tag(fp, 8, "d_tag:0x%X (%s)" % (d_tag, tagStr))
-            tagUint64(fp, "val_ptr")
-            fp.seek(tmp)
-            tag(fp, SIZE_ELF64_DYN, "Elf64_Dyn (%s)" % tagStr)
-
-            if d_tag == DynamicType.DT_NULL:
-                break
+            if not tag_elf64_dyn(fp, e_machine):
+                break;
 
     symtab_name2addr = {}
     symtab_addr2name = {}
@@ -249,21 +320,34 @@ def analyze(fp):
     # read program headers
     # REMINDER! struct member 'p_flags' changes between 32/64 bits
     fp.seek(e_phoff)
+    phdr_infos = []
     for i in range(e_phnum):
-        oHdr = fp.tell()
-        p_type = uint32(fp, True)
-        tagUint32(fp, 'p_type', '('+phdr_type_tostr(p_type)+')')
-        p_flags = uint32(fp, True)
-        tagUint32(fp, 'p_flags', '('+phdr_flags_tostr(p_flags)+')')
-        tagUint64(fp, 'p_offset')
-        tagUint64(fp, 'p_vaddr')
-        tagUint64(fp, 'p_paddr')
-        tagUint64(fp, 'p_filesz')
-        tagUint64(fp, 'p_memsz')
-        tagUint64(fp, 'p_align')
+        info:dict = tag_elf64_phdr(fp, i)
+        phdr_infos.append(info)
 
-        print('[0x%X,0x%X) raw elf64_phdr index=%d' % \
-            (oHdr, fp.tell(), i))
+
+    for i, info in enumerate(phdr_infos):
+        start = info['p_offset']
+        end = start + info['p_filesz']
+
+        # top level container
+        if not (start and end):
+            continue
+
+        type_str = phdr_type_tostr(info['p_type'])
+
+        print('[0x%X,0x%X) raw segment idx:%d type:%s' % \
+            (start, end, i, type_str))
+
+        # If a dynamic program header / segment exists, but it wasn't tagged in a section,
+        # tag it now. Some toolchains produce section-less binaries.
+        if info['p_type'] == PT_DYNAMIC:
+            if not [si for si in scn_infos if si['sh_type'] == SHT_DYNAMIC]:
+                fp.seek(start)
+
+                while fp.tell() < end:
+                    if not tag_elf64_dyn(fp, e_machine):
+                        break
 
 if __name__ == '__main__':
     import sys
