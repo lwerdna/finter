@@ -71,7 +71,7 @@ def tag_elf32_sym(fp, index, strTab:StringTable):
 
     st_shndx = tagUint16(fp, "st_shndx")
     fp.seek(base)
-    tag(fp, SIZE_ELF32_SYM, "Elf32_Sym \"%s\" (index:%d)" % (nameStr, index))
+    tag(fp, SIZEOF_ELF32_SYM, "Elf32_Sym \"%s\" (index:%d)" % (nameStr, index))
 
 def tag_elf32_dyn(fp, e_machine):
     base = fp.tell()
@@ -80,7 +80,7 @@ def tag_elf32_dyn(fp, e_machine):
     tag(fp, 4, "d_tag:0x%X (%s)" % (d_tag, tagStr))
     tagUint32(fp, "val_ptr")
     fp.seek(base)
-    tag(fp, SIZE_ELF32_DYN, "Elf32_Dyn (%s)" % tagStr)
+    tag(fp, SIZEOF_ELF32_DYN, "Elf32_Dyn (%s)" % tagStr)
 
     return d_tag != DynamicType.DT_NULL
 
@@ -148,7 +148,7 @@ def analyze(fp):
            return
 
     # read elf32_hdr
-    tag(fp, SIZE_ELF32_HDR, "elf32_hdr", 1)
+    tag(fp, SIZEOF_ELF32_HDR, "elf32_hdr", 1)
     tag(fp, 4, "e_ident[0..4)")
     tagUint8(fp, "e_ident[EI_CLASS] (32-bit)")
     ei_data = uint8(fp, 1)
@@ -172,16 +172,16 @@ def analyze(fp):
     e_shoff = tagUint32(fp, "e_shoff")
     tagUint32(fp, "e_flags")
     e_ehsize = tagUint16(fp, "e_ehsize")
-    assert(e_ehsize == SIZE_ELF32_HDR)
+    assert(e_ehsize == SIZEOF_ELF32_HDR)
     tagUint16(fp, "e_phentsize")
     e_phnum = tagUint16(fp, "e_phnum")
     e_shentsize = tagUint16(fp, "e_shentsize")
-    assert(e_shentsize == 0 or e_shentsize == SIZE_ELF32_SHDR)
+    assert(e_shentsize == 0 or e_shentsize == SIZEOF_ELF32_SHDR)
     e_shnum = tagUint16(fp, "e_shnum")
     e_shstrndx = tagUint16(fp, "e_shstrndx")
 
     # read the string table
-    tmp = e_shoff + e_shstrndx*SIZE_ELF32_SHDR
+    tmp = e_shoff + e_shstrndx*SIZEOF_ELF32_SHDR
     #print('seeking to %X for the string table section header' % tmp)
     fp.seek(tmp)
     fmt = {ELFDATA2LSB:'<IIIIII', ELFDATA2MSB:'>IIIIII'}[ei_data]

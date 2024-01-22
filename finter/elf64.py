@@ -1,5 +1,20 @@
 #!/usr/bin/env python
 
+# /*
+#  * ELF definitions common to all 64-bit architectures.
+#  */
+#
+# All the ELF types are 8 bytes, except for Word, Sword
+#
+# typedef uint64_t	Elf64_Addr;
+# typedef uint16_t	Elf64_Half;   <-- 16
+# typedef uint64_t	Elf64_Off;
+# typedef int32_t	Elf64_Sword;  <-- 32
+# typedef int64_t	Elf64_Sxword;
+# typedef uint32_t	Elf64_Word;   <-- 32
+# typedef uint64_t	Elf64_Lword;
+# typedef uint64_t	Elf64_Xword;
+
 import sys
 import struct
 import binascii
@@ -67,42 +82,44 @@ def tag_elf64_dyn(fp, e_machine):
     d_val = tagUint64(fp, 'd_val')
     # tag root struct
     fp.seek(base)
-    tag(fp, SIZE_ELF64_DYN, "Elf64_Dyn (%s)" % tag)
+    tag(fp, SIZEOF_ELF64_DYN, "Elf64_Dyn (%s)" % tag)
     # return
     return d_tag != DynamicType.DT_NULL
 
 # typedef struct {
-#         Elf64_Word      sh_name;
-#         Elf64_Word      sh_type;
-#         Elf64_Xword     sh_flags;
-#         Elf64_Addr      sh_addr;
-#         Elf64_Off       sh_offset;
-#         Elf64_Xword     sh_size;
-#         Elf64_Word      sh_link;
-#         Elf64_Word      sh_info;
-#         Elf64_Xword     sh_addralign;
-#         Elf64_Xword     sh_entsize;
+#         Elf64_Word      sh_name; // 4
+#         Elf64_Word      sh_type; // 4
+#         Elf64_Xword     sh_flags; // 8
+#         Elf64_Addr      sh_addr; // 8
+#         Elf64_Off       sh_offset; // 8
+#         Elf64_Xword     sh_size; // 8
+#         Elf64_Word      sh_link; // 4
+#         Elf64_Word      sh_info; // 4
+#         Elf64_Xword     sh_addralign; // 8
+#         Elf64_Xword     sh_entsize; // 8
 # } Elf64_Shdr;
+#
+# 72 bytes total!
 def tag_elf64_shdr(fp, index, scnStrTab):
     base = fp.tell()
 
-    sh_name = tagUint64(fp, "sh_name")
-    sh_type = uint64(fp, 1)
-    tag(fp, 4, "sh_type=0x%X (%s)" % \
-        (sh_type, sh_type_tostr(sh_type)))
+    sh_name = tagUint32(fp, "sh_name")
+    sh_type = uint32(fp, 1)
+    tagUint32(fp, "sh_type=0x%X (%s)" % (sh_type, sh_type_tostr(sh_type)))
     sh_flags = uint64(fp, 1)
-    tag(fp, 4, "sh_flags=0x%X (%s)" % \
-        (sh_flags, sh_flags_tostr(sh_flags)))
+    tagUint64(fp, "sh_flags=0x%X (%s)" % (sh_flags, sh_flags_tostr(sh_flags)))
     sh_addr = tagUint64(fp, "sh_addr")
     sh_offset = tagUint64(fp, "sh_offset")
     sh_size = tagUint64(fp, "sh_size")
-    sh_link = tagUint64(fp, "sh_link") # usually the section index of the associated string or symbol table
-    sh_info = tagUint64(fp, "sh_info") # usually the section index of the section to which this applies
+    sh_link = tagUint32(fp, "sh_link") # usually the section index of the associated string or symbol table
+    sh_info = tagUint32(fp, "sh_info") # usually the section index of the section to which this applies
     sh_addralign = tagUint64(fp, "sh_addralign")
     sh_entsize = tagUint64(fp, "sh_entsize")
 
+    assert (fp.tell() - base) == SIZEOF_ELF64_SHDR
+
     fp.seek(base)
-    tag(fp, SIZE_ELF64_SHDR, 'elf32_shdr "%s" %s (index: %d)' % \
+    tag(fp, SIZEOF_ELF64_SHDR, 'elf64_shdr "%s" %s (index: %d)' % \
         (scnStrTab[sh_name], sh_type_tostr(sh_type), index))
 
     return {'sh_name':sh_name,
@@ -149,7 +166,7 @@ def tag_elf64_phdr(fp, index):
 def analyze(fp):
     if not isElf64(fp):
            return
-    tag(fp, SIZE_ELF64_HDR, "elf64_hdr", 1)
+    tag(fp, SIZEOF_ELF64_HDR, "elf64_hdr", 1)
     tag(fp, 4, "e_ident[0..4)")
     tagUint8(fp, "e_ident[EI_CLASS] (64-bit)")
     ei_data = uint8(fp, 1)
@@ -181,7 +198,7 @@ def analyze(fp):
     e_shstrndx = tagUint16(fp, "e_shstrndx")
 
     # read the string table
-    fp.seek(e_shoff + e_shstrndx*SIZE_ELF64_SHDR)
+    fp.seek(e_shoff + e_shstrndx*SIZEOF_ELF64_SHDR)
     tmp = fp.tell()
     fmt = {ELFDATA2LSB:'<IIQQQQ', ELFDATA2MSB:'>IIQQQQ'}[ei_data]
     (a,b,c,d,sh_offset,sh_size) = struct.unpack(fmt, fp.read(40))
@@ -221,12 +238,12 @@ def analyze(fp):
             debug_info = [sh_offset, sh_size]
         if strName == '.debug_abbrev':
             debug_abbrev = [sh_offset, sh_size]
-        if sh_type == SHT_RELA:
+        if info['sh_type'] == SHT_RELA:
             rela_sections.append((sh_offset, sh_size))
 
-        if (not sh_type in [SHT_NULL, SHT_NOBITS]):
+        if (not info['sh_type'] in [SHT_NULL, SHT_NOBITS]):
             print('[0x%X,0x%X) raw section "%s" contents' % \
-                (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
+                (sh_offset, sh_offset+sh_size, scnStrTab[info['sh_name']]))
 
     # certain sections we analyze deeper...
     if strtab:
@@ -264,7 +281,7 @@ def analyze(fp):
             st_value = tagUint64(fp, "st_value")
             st_size = tagUint64(fp, "st_size")
             fp.seek(tmp)
-            tag(fp, SIZE_ELF64_SYM, "Elf64_Sym \"%s\"" % nameStr)
+            tag(fp, SIZEOF_ELF64_SYM, "Elf64_Sym \"%s\"" % nameStr)
 
             symtab_name2addr[nameStr] = st_value
             symtab_addr2name[st_value] = nameStr
