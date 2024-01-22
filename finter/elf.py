@@ -16,7 +16,7 @@ SIZEOF_ELF32_DYN = 0x8
 
 SIZEOF_ELF64_HDR = 0x40
 SIZEOF_ELF64_PHDR = 0x38
-SIZEOF_ELF64_SHDR = 0x40
+SIZEOF_ELF64_SHDR = 0x40 # should match Elf64_Hdr.e_shentsize
 SIZEOF_ELF64_SYM = 0x18
 SIZEOF_ELF64_DYN = 0x10
 
@@ -284,16 +284,16 @@ SHT_LOUSER = 0x80000000
 SHT_HIUSER = 0xFFFFFFFF
 def sh_type_tostr(t):
     lookup = {
-        SHT_NULL:'NULL', SHT_PROGBITS:'PROGBITS', SHT_SYMTAB:'SYMTAB',
-        SHT_STRTAB:'STRTAB', SHT_RELA:'RELA', SHT_HASH:'HASH',
-        SHT_DYNAMIC:'DYNAMIC', SHT_NOTE:'NOTE', SHT_NOBITS:'NOBITS',
-        SHT_REL:'REL', SHT_SHLIB:'SHLIB', SHT_DYNSYM:'DYNSYM',
-        SHT_INIT_ARRAY:'INIT_ARRAY', SHT_FINI_ARRAY:'FINI_ARRAY', SHT_PREINIT_ARRAY:'PREINIT_ARRAY',
-        SHT_GROUP:'GROUP', SHT_SYMTAB_SHNDX:'SYMTAB_SHNDX', SHT_NUM:'NUM',
-        SHT_GNU_ATTRIBUTES:'GNU_ATTRIBUTES', SHT_GNU_HASH:'GNU_HASH', SHT_GNU_LIBLIST:'GNU_LIBLIST',
-        SHT_CHECKSUM:'CHECKSUM', SHT_SUNW_move:'SUNW_move', SHT_SUNW_COMDAT:'SUNW_COMDAT',
-        SHT_SUNW_syminfo:'SUNW_syminfo', SHT_GNU_verdef:'GNU_verdef', SHT_GNU_verneed:'GNU_verneed',
-        SHT_GNU_versym:'GNU_versym'
+        SHT_NULL:'SHT_NULL', SHT_PROGBITS:'SHT_PROGBITS', SHT_SYMTAB:'SHT_SYMTAB',
+        SHT_STRTAB:'SHT_STRTAB', SHT_RELA:'SHT_RELA', SHT_HASH:'SHT_HASH',
+        SHT_DYNAMIC:'SHT_DYNAMIC', SHT_NOTE:'SHT_NOTE', SHT_NOBITS:'SHT_NOBITS',
+        SHT_REL:'SHT_REL', SHT_SHLIB:'SHT_SHLIB', SHT_DYNSYM:'SHT_DYNSYM',
+        SHT_INIT_ARRAY:'SHT_INIT_ARRAY', SHT_FINI_ARRAY:'SHT_FINI_ARRAY', SHT_PREINIT_ARRAY:'SHT_PREINIT_ARRAY',
+        SHT_GROUP:'SHT_GROUP', SHT_SYMTAB_SHNDX:'SHT_SYMTAB_SHNDX', SHT_NUM:'SHT_NUM',
+        SHT_GNU_ATTRIBUTES:'SHT_GNU_ATTRIBUTES', SHT_GNU_HASH:'SHT_GNU_HASH', SHT_GNU_LIBLIST:'SHT_GNU_LIBLIST',
+        SHT_CHECKSUM:'SHT_CHECKSUM', SHT_SUNW_move:'SHT_SUNW_move', SHT_SUNW_COMDAT:'SHT_SUNW_COMDAT',
+        SHT_SUNW_syminfo:'SHT_SUNW_syminfo', SHT_GNU_verdef:'SHT_GNU_verdef', SHT_GNU_verneed:'SHT_GNU_verneed',
+        SHT_GNU_versym:'SHT_GNU_versym'
     }
     if t in lookup:
         return lookup[t]
@@ -650,6 +650,39 @@ class RELOC_TYPE_ARM64(Enum):
     R_AARCH64_MOVW_PREL_G2_NC = 292
     R_AARCH64_MOVW_PREL_G3 = 293
     R_AARCH64_RELATIVE = 1027
+
+class RELOC_TYPE_386(Enum):
+    R_386_NONE = 0
+    R_386_32 = 1
+    R_386_PC32 = 2
+    R_386_GOT32 = 3
+    R_386_PLT32 = 4
+    R_386_COPY = 5
+    R_386_GLOB_DAT = 6
+    R_386_JMP_SLOT = 7
+    R_386_RELATIVE = 8
+    R_386_GOTOFF = 9
+    R_386_GOTPC = 10
+    R_386_NUM = 11
+
+class RELOC_TYPE_X86_64(Enum):
+    R_X86_64_NONE = 0
+    R_X86_64_64 = 1 # Direct 64 bit
+    R_X86_64_PC32 = 2 # PC relative 32 bit signed
+    R_X86_64_GOT32 = 3 # 32 bit GOT entry
+    R_X86_64_PLT32 = 4 # 32 bit PLT address
+    R_X86_64_COPY = 5 # Copy symbol at runtime
+    R_X86_64_GLOB_DAT = 6 # Create GOT entry
+    R_X86_64_JUMP_SLOT = 7 # Create PLT entry
+    R_X86_64_RELATIVE = 8 # Adjust by program base
+    R_X86_64_GOTPCREL = 9 # 32 bit signed pc relative offset to GOT
+    R_X86_64_32 = 10 # Direct 32 bit zero extended
+    R_X86_64_32S = 11 # Direct 32 bit sign extended
+    R_X86_64_16 = 12 # Direct 16 bit zero extended
+    R_X86_64_PC16 = 13 # 16 bit sign extended pc relative
+    R_X86_64_8 = 14 # Direct 8 bit sign extended
+    R_X86_64_PC8 = 15 # 8 bit sign extended pc relative
+    R_X86_64_PC64 = 24 # Place relative 64-bit signed
 
 ###############################################################################
 # taggers common to elf32/elf64

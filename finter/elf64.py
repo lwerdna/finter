@@ -62,6 +62,8 @@ def tag_elf64_rela(fp, machine:E_MACHINE=None):
         r_type_str = ''
         if machine == E_MACHINE.EM_AARCH64.value:
             r_type_str = ' (' + RELOC_TYPE_ARM64(r_type).name + ')'
+        elif machine == E_MACHINE.EM_X86_64.value:
+            r_type_str = ' (' + RELOC_TYPE_X86_64(r_type).name + ')'
         tagUint64(fp, 'r_info', f'sym=0x{r_sym:X} type=0x{r_type:X}{r_type_str}')
 
     tagInt64(fp, 'r_addend')
@@ -73,7 +75,7 @@ def tag_elf64_rela(fp, machine:E_MACHINE=None):
 #                 Elf64_Addr      d_ptr;
 #         } d_un;
 # } Elf64_Dyn;
-def tag_elf64_dyn(fp, e_machine):
+def tag_elf64_dyn(fp, e_machine, dynStrTab=None):
     base = fp.tell()
     # tag d_tag
     d_tag = uint64(fp, 1)
@@ -82,8 +84,13 @@ def tag_elf64_dyn(fp, e_machine):
     d_val = tagUint64(fp, 'd_val')
     # tag root struct
     fp.seek(base)
-    tag(fp, SIZEOF_ELF64_DYN, "Elf64_Dyn (%s)" % tag)
-    # return
+
+    extra = ''
+    if d_tag == DynamicType.DT_NEEDED.value and dynStrTab:
+        extra = f' "{dynStrTab[d_val]}"'
+
+    tag(fp, SIZEOF_ELF64_DYN, f'Elf64_Dyn{extra}')
+
     return d_tag != DynamicType.DT_NULL
 
 # typedef struct {
@@ -191,9 +198,11 @@ def analyze(fp):
     e_shoff = tagUint64(fp, "e_shoff")
     tagUint32(fp, "e_flags")
     tagUint16(fp, "e_ehsize")
-    tagUint16(fp, "e_phentsize")
+    e_phentsize = tagUint16(fp, "e_phentsize")
+    assert(e_phentsize == SIZEOF_ELF64_PHDR)
     e_phnum = tagUint16(fp, "e_phnum")
-    tagUint16(fp, "e_shentsize")
+    e_shentsize = tagUint16(fp, "e_shentsize")
+    assert(e_shentsize == SIZEOF_ELF64_SHDR)
     e_shnum = tagUint16(fp, "e_shnum")
     e_shstrndx = tagUint16(fp, "e_shstrndx")
 
@@ -213,6 +222,7 @@ def analyze(fp):
         scn_infos.append(info)
 
     dynamic = None
+    dynstr = None
     symtab = None
     strtab = None
     debug_info = None
@@ -221,13 +231,20 @@ def analyze(fp):
 
     # tag section contents
     for i, info in enumerate(scn_infos):
-        fp.seek(info['sh_offset'])
+        sh_name = info['sh_name']
+        sh_size = info['sh_size']
+        sh_type = info['sh_type']
+        sh_offset = info['sh_offset']
 
-        strName = scnStrTab[info['sh_name']]
+        fp.seek(sh_offset)
+
+        strName = scnStrTab[sh_name]
 
         # store info on special sections
         if strName == '.dynamic':
             dynamic = [sh_offset, sh_size]
+        if strName == '.dynstr':
+            dynstr = [sh_offset, sh_size]
         if strName == '.symtab':
             symtab = [sh_offset, sh_size]
         if strName == '.strtab':
@@ -238,12 +255,12 @@ def analyze(fp):
             debug_info = [sh_offset, sh_size]
         if strName == '.debug_abbrev':
             debug_abbrev = [sh_offset, sh_size]
-        if info['sh_type'] == SHT_RELA:
+        if sh_type == SHT_RELA:
             rela_sections.append((sh_offset, sh_size))
 
-        if (not info['sh_type'] in [SHT_NULL, SHT_NOBITS]):
+        if (not sh_type in [SHT_NULL, SHT_NOBITS]):
             print('[0x%X,0x%X) raw section "%s" contents' % \
-                (sh_offset, sh_offset+sh_size, scnStrTab[info['sh_name']]))
+                (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
 
     # certain sections we analyze deeper...
     if strtab:
@@ -252,11 +269,18 @@ def analyze(fp):
         strTab = StringTable(fp, size)
 
     if dynamic:
+        # do we have a string table for the dynamic section?
+        dynStrTab = None
+        if dynstr:
+            offs, size = dynstr
+            fp.seek(offs)
+            dynStrTab = StringTable(fp, size)
+
         # .dynamic is just an array of Elf64_Dyn entries
         [offs,size] = dynamic
         fp.seek(offs)
         while fp.tell() < (offs + size):
-            if not tag_elf64_dyn(fp, e_machine):
+            if not tag_elf64_dyn(fp, e_machine, dynStrTab):
                 break;
 
     symtab_name2addr = {}
