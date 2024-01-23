@@ -22,7 +22,8 @@ if __name__ == '__main__':
 
     dot.append('// nodes')
     for n in all_nodes(root):
-        label = f'[0x{n.begin:X}, 0x{n.end:X})\\l{n.data}'
+        label = f'[0x{n.begin:X}, 0x{n.end:X})\\l{n.comment}'
+        label = label.replace('"', '\\"')
         dot.append(f'{id(n)} [label="{label}"];')
 
     def all_edges(n):

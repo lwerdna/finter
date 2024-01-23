@@ -35,6 +35,7 @@ class OHANode(FinterNode):
             for child in sorted(self.children, key=lambda c: c.begin):
                 child.pretty_print(depth+1)
         else:
+            self.fp.seek(self.begin)
             data = self.fp.read(self.end - self.begin)
             oha(data, self.begin, comment)
 

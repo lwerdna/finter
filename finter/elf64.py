@@ -93,6 +93,23 @@ def tag_elf64_dyn(fp, e_machine, dynStrTab=None):
 
     return d_tag != DynamicType.DT_NULL
 
+def tag_elf64_sym(fp, index, strTab):
+    base = fp.tell()
+    st_name = uint32(fp, 1)
+    nameStr = strTab[st_name] if strTab else ''
+    tag(fp, 4, "st_name=0x%X \"%s\"" % (st_name, nameStr))
+    st_info = uint8(fp, 1)
+    bindingStr = symbol_binding_tostr(ELF64_ST_BIND(st_info))
+    typeStr = symbol_type_tostr(ELF64_ST_TYPE(st_info))
+    tag(fp, 1, "st_info bind:%d(%s) type:%d(%s)" % \
+        (st_info>>4, bindingStr, st_info&0xF, typeStr))
+    st_other = tagUint8(fp, "st_other")
+    st_shndx = tagUint16(fp, "st_shndx")
+    st_value = tagUint64(fp, "st_value")
+    st_size = tagUint64(fp, "st_size")
+    fp.seek(base)
+    tag(fp, SIZEOF_ELF64_SYM, "Elf64_Sym[%d] \"%s\"" % (index, nameStr))
+
 # typedef struct {
 #         Elf64_Word      sh_name; // 4
 #         Elf64_Word      sh_type; // 4
@@ -222,6 +239,7 @@ def analyze(fp):
         scn_infos.append(info)
 
     dynamic = None
+    dynsym = None
     dynstr = None
     symtab = None
     strtab = None
@@ -243,6 +261,8 @@ def analyze(fp):
         # store info on special sections
         if strName == '.dynamic':
             dynamic = [sh_offset, sh_size]
+        if strName == '.dynsym':
+            dynsym = [sh_offset, sh_size]
         if strName == '.dynstr':
             dynstr = [sh_offset, sh_size]
         if strName == '.symtab':
@@ -283,53 +303,40 @@ def analyze(fp):
             if not tag_elf64_dyn(fp, e_machine, dynStrTab):
                 break;
 
-    symtab_name2addr = {}
-    symtab_addr2name = {}
-    if symtab:
-        # .symbtab is an array of Elf64_Sym entries
-        # note that Elf64_Sym differs from Elf32_Sym beyond field sizes
-        [offs,size] = symtab
+    # symbols come in two sections: .symtab with strings in .strtab
+    #                               .dynsym with strings in .dynstr
+    #
+    # the sections are simply an array of Elf64_Sym
+    for (sym_section, lookup) in [(symtab, strTab), (dynsym, dynStrTab)]:
+        if not sym_section:
+            continue
+        offs, size = sym_section
         fp.seek(offs)
+        index = 0
         while fp.tell() < (offs + size):
-            tmp = fp.tell()
-            st_name = uint32(fp, 1)
-            nameStr = strTab[st_name]
-            tag(fp, 4, "st_name=0x%X \"%s\"" % (st_name,nameStr))
-            st_info = uint8(fp, 1)
-            bindingStr = symbol_binding_tostr(ELF64_ST_BIND(st_info))
-            typeStr = symbol_type_tostr(ELF64_ST_TYPE(st_info))
-            tag(fp, 1, "st_info bind:%d(%s) type:%d(%s)" % \
-                (st_info>>4, bindingStr, st_info&0xF, typeStr))
-            st_other = tagUint8(fp, "st_other")
-            st_shndx = tagUint16(fp, "st_shndx")
-            st_value = tagUint64(fp, "st_value")
-            st_size = tagUint64(fp, "st_size")
-            fp.seek(tmp)
-            tag(fp, SIZEOF_ELF64_SYM, "Elf64_Sym \"%s\"" % nameStr)
+            tag_elf64_sym(fp, index, lookup)
+            index += 1
 
-            symtab_name2addr[nameStr] = st_value
-            symtab_addr2name[st_value] = nameStr
-
-    opd = False
-    if opd and E_MACHINE(e_machine) == E_MACHINE.EM_PPC64:
-        [offs, size, scn_vaddr_base] = opd
-        fp.seek(offs)
-        func_descr_idx = 0
-        while fp.tell() < (offs + size):
-            tmp = fp.tell()
-            tagUint64(fp, "entry")
-            tagUint64(fp, "toc")
-            tagUint64(fp, "environ")
-
-            vaddr = scn_vaddr_base + (tmp - offs)
-
-            fp.seek(tmp)
-            if vaddr in symtab_addr2name:
-                tag(fp, 24, "descriptor \"%s\"" % symtab_addr2name[vaddr])
-            else:
-                tag(fp, 24, "descriptor %d" % func_descr_idx)
-
-            func_descr_idx += 1
+#    opd = False
+#    if opd and E_MACHINE(e_machine) == E_MACHINE.EM_PPC64:
+#        [offs, size, scn_vaddr_base] = opd
+#        fp.seek(offs)
+#        func_descr_idx = 0
+#        while fp.tell() < (offs + size):
+#            tmp = fp.tell()
+#            tagUint64(fp, "entry")
+#            tagUint64(fp, "toc")
+#            tagUint64(fp, "environ")
+#
+#            vaddr = scn_vaddr_base + (tmp - offs)
+#
+#            fp.seek(tmp)
+#            if vaddr in symtab_addr2name:
+#                tag(fp, 24, "descriptor \"%s\"" % symtab_addr2name[vaddr])
+#            else:
+#                tag(fp, 24, "descriptor %d" % func_descr_idx)
+#
+#            func_descr_idx += 1
 
     if debug_info:
         [scn_addr, scn_sz] = debug_info
