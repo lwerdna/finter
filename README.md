@@ -1,22 +1,42 @@
 # finter
-decompose files into offset intervals
+This is an approach to file decomposition
 
-The programs ("dissectors") in ./finter like `./finter/elf32.py` read a file and print on stdout information:
+Decompose files into offset intervals. The modules in `./finter` like `./finter/elf32.py` read a file and print on stdout information with the following syntax:
 
-    [0x0,0x34) elf32_hdr
-    [0x0,0x4) e_ident[0..4)
-    [0x4,0x5) e_ident[EI_CLASS] (32-bit)=0x1
-    [0x5,0x6) e_ident[EI_DATA] MSB (big-end)=0x2
-    [0x6,0x7) e_ident[EI_VERSION]=0x1
-    [0x7,0x8) e_ident[EI_OSABI]=0x0
-    [0x8,0x9) e_ident[EI_ABIVERSION]=0x0
-    [0x9,0x10) e_ident[EI_PAD]
-    [0x10,0x12) e_type=0x2
-    [0x12,0x14) e_machine=0x8
+```
+<interval> <type> <text>
+```
+
+For example:
+
+```
+[0x0,0x40) raw elf64_hdr
+```
+
+This means the bytes in interval `[0x0,0x40)`, have type `raw`, and should be associated with text `elf64_hdr`.
+
+Another example:
+
+```
+[0x12,0x14) <H e_machine EM_X86_64=0x3E
+```
+
+This means the byte in interval `[0x4, 0x5)` has type `<H` (a little-endian ordered halfword) and should be associated with text `e_machine EM_X86_64=0x3E`.
+
+Multiple of these tags can annotate a full struct:
+
+      [0x0,0x40) raw elf64_hdr
+      [0x0,0x4) raw e_ident[0..4)
+      [0x4,0x5) <B e_ident[EI_CLASS] (64-bit)=0x2
+      [0x5,0x6) <B e_ident[EI_DATA] LSB (little-end)=0x1
+      [0x6,0x7) <B e_ident[EI_VERSION] (little-end)=0x1
+      [0x7,0x8) <B e_ident[EI_OSABI]=0x0
+      [0x8,0x9) <B e_ident[EI_ABIVERSION]=0x0
+      [0x9,0x10) raw e_ident[EI_PAD]
+      [0x10,0x12) <H e_type ET_EXEC=0x2
+      [0x12,0x14) <H e_machine EM_X86_64=0x3E
     ...
-It is all very simple plaintext. The two parts are the memory range and the text of the interval. Intervals are separated by newlines.
-
-Dissectors do not have to worry about ordering intervals or providing hierarchical information. External programs that consume the intervals can derive all of that.
+Dissectors do not have to worry about ordering or providing hierarchical information. External programs that consume the intervals can derive all of that.
 
 ## example users of intervals
 

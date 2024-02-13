@@ -111,13 +111,13 @@ def tagReloc(fp, size, machine=''):
 
         # peek on VirtualAddress and SizeOfBlock
         if uint64(fp, True) == 0:
-            print('[0x%X,0x%X) reloc block NULL' % (oBlockStart, oBlockStart+8))
+            print('[0x%X,0x%X) raw reloc block NULL' % (oBlockStart, oBlockStart+8))
             break;
 
         VirtualAddress = tagUint32(fp, "VirtualAddress")    
         SizeOfBlock = tagUint32(fp, "SizeOfBlock")
         nEntries = (SizeOfBlock-8)//2
-        print('[0x%X,0x%X) reloc block 0x%X (%d entries)' % \
+        print('[0x%X,0x%X) raw reloc block 0x%X (%d entries)' % \
           (oBlockStart, oBlockStart+SizeOfBlock, VirtualAddress, nEntries))
 
         for i in range(nEntries):

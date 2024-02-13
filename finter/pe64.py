@@ -38,7 +38,7 @@ def analyze(fp):
     tagUint16(fp, "e_oeminfo")
     tag(fp, 20, "e_res2");
     e_lfanew = tagUint32(fp, "e_lfanew")
-    print("[0x%X,0x%X) image_dos_header" % \
+    print("[0x%X,0x%X) raw image_dos_header" % \
         (oHdr, fp.tell()))
     
     # image_nt_headers has signature and two substructures
@@ -55,7 +55,7 @@ def analyze(fp):
     NumberOfSymbols = tagUint32(fp, "NumberOfSymbols")
     SizeOfOptionalHeader = tagUint16(fp, "SizeOfOptionalHeader")
     tagUint16(fp, "Characteristics")
-    print("[0x%X,0x%X) image_file_header" % \
+    print("[0x%X,0x%X) raw image_file_header" % \
         (oIFH, fp.tell()))
     # second substructure is image_optional_header
     oIOH = fp.tell()
@@ -100,11 +100,11 @@ def analyze(fp):
         tagUint32(fp, "Size")
         print("[0x%X,0x%X) DataDir %s" % \
             (oDE, fp.tell(), pe.dataDirIdxToStr(i)))
-    print("[0x%X,0x%X) DataDirectory" % \
+    print("[0x%X,0x%X) raw DataDirectory" % \
         (oDD, fp.tell()))
-    print("[0x%X,0x%X) image_optional_header64" % \
+    print("[0x%X,0x%X) raw image_optional_header64" % \
         (oIOH, fp.tell()))
-    print("[0x%X,0x%X) image_nt_headers" % \
+    print("[0x%X,0x%X) raw image_nt_headers" % \
         (e_lfanew, fp.tell()))
     
     (oScnReloc,nScnReloc)=(None,None)
@@ -122,9 +122,9 @@ def analyze(fp):
         tagUint16(fp, "NumberOfRelocations")
         tagUint16(fp, "NumberOfLineNumbers")
         tagUint32(fp, "Characteristics")
-        print("[0x%X,0x%X) image_section_header \"%s\"" % \
+        print("[0x%X,0x%X) raw image_section_header \"%s\"" % \
             (oISH, fp.tell(), Name.rstrip(b'\0')))
-        print("[0x%X,0x%X) section \"%s\" contents" % \
+        print("[0x%X,0x%X) raw section \"%s\" contents" % \
             (PointerToRawData, PointerToRawData+SizeOfRawData, Name.rstrip(b'\0')))
 
         if Name==b'.reloc\x00\x00':

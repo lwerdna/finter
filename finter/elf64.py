@@ -270,7 +270,7 @@ def analyze(fp):
         if strName == '.strtab':
             strtab = [sh_offset, sh_size]
         if strName == '.opd':
-            opd = [sh_offset, sh_size, sh_addr]
+            opd = [sh_offset, sh_size]
         if strName == '.debug_info':
             debug_info = [sh_offset, sh_size]
         if strName == '.debug_abbrev':
