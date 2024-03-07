@@ -629,7 +629,7 @@ def analyze(fp):
             fp.seek(oCmd + lc_str)
             path = string(fp, cmdSize - lc_str)
 
-            print('[0x%X,0x%X) dylnker_command \"%s\"' % \
+            print('[0x%X,0x%X) dylinker_command \"%s\"' % \
                 (oCmd, oCmd+cmdSize, path))
 
         elif (cmd == LOAD_COMMAND_TYPE.LC_DYLD_INFO) or (cmd == LOAD_COMMAND_TYPE.LC_DYLD_INFO_ONLY):
@@ -643,7 +643,7 @@ def analyze(fp):
             tagUint32(fp, "lazy_bind_size")
             tagUint32(fp, "export_off")
             tagUint32(fp, "export_size")
-            print('[0x%X,0x%X) dyld_info_command' % \
+            print('[0x%X,0x%X) raw dyld_info_command' % \
                 (oCmd, fp.tell()))
 
         elif cmd == LOAD_COMMAND_TYPE.LC_SYMTAB:
@@ -651,7 +651,7 @@ def analyze(fp):
             nsyms = tagUint32(fp, "nsyms")
             stroff = tagUint32(fp, "stroff")
             tagUint32(fp, "strsize")
-            print('[0x%X,0x%X) symtab_command' % \
+            print('[0x%X,0x%X) raw symtab_command' % \
                 (oCmd, fp.tell()))
 
             (symtab_offset, symtab_amount, symtab_strtab_offset) = (symoff, nsyms, stroff)
@@ -696,7 +696,7 @@ def analyze(fp):
         elif cmd in [LOAD_COMMAND_TYPE.LC_FUNCTION_STARTS, LOAD_COMMAND_TYPE.LC_DATA_IN_CODE]:
             offs = tagUint32(fp, 'data offset')
             length = tagUint32(fp, 'data length')
-            print('[0x%X,0x%X) %s' % (oCmd, oCmd+cmdSize, cmd.name))
+            print('[0x%X,0x%X) raw %s' % (oCmd, oCmd+cmdSize, cmd.name))
 
             if length:
                 fp.seek(offs)
@@ -730,7 +730,7 @@ def analyze(fp):
             tagUint32(fp, "nextrel")
             locreloff = tagUint32(fp, "locreloff")
             nlocrel = tagUint32(fp, "nlocrel")
-            print('[0x%X,0x%X) dysymtab_command' % \
+            print('[0x%X,0x%X) raw dysymtab_command' % \
                 (oCmd, fp.tell()))
 
             if locreloff and nlocrel:
@@ -748,7 +748,7 @@ def analyze(fp):
         for i in range(symtab_amount):
             sym_name = tag_nlist(fp, cputype, symtab_strtab_offset)
             symtab_strings.append(sym_name)
-        print('[0x%X,0x%X) symbol table contents' % (symtab_offset, fp.tell()))
+        print('[0x%X,0x%X) raw symbol table contents' % (symtab_offset, fp.tell()))
 
     # parse relocation areas referenced by sections
     for (reloff, nreloc, info) in reloc_areas:
