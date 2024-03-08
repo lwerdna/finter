@@ -216,7 +216,7 @@ def analyze(fp):
     tagUint32(fp, "e_flags")
     tagUint16(fp, "e_ehsize")
     e_phentsize = tagUint16(fp, "e_phentsize")
-    assert(e_phentsize == SIZEOF_ELF64_PHDR)
+    assert(e_phentsize in [0, SIZEOF_ELF64_PHDR])
     e_phnum = tagUint16(fp, "e_phnum")
     e_shentsize = tagUint16(fp, "e_shentsize")
     assert(e_shentsize == SIZEOF_ELF64_SHDR)
@@ -283,14 +283,15 @@ def analyze(fp):
                 (sh_offset, sh_offset+sh_size, scnStrTab[sh_name]))
 
     # certain sections we analyze deeper...
+    strTab = None
     if strtab:
-        [offs,size] = strtab
+        [offs, size] = strtab
         fp.seek(offs)
         strTab = StringTable(fp, size)
 
+    dynStrTab = None
     if dynamic:
         # do we have a string table for the dynamic section?
-        dynStrTab = None
         if dynstr:
             offs, size = dynstr
             fp.seek(offs)
@@ -307,7 +308,13 @@ def analyze(fp):
     #                               .dynsym with strings in .dynstr
     #
     # the sections are simply an array of Elf64_Sym
-    for (sym_section, lookup) in [(symtab, strTab), (dynsym, dynStrTab)]:
+    queue = []
+    if strTab:
+        queue.append((symtab, strTab))
+    if dynStrTab:
+        queue.append((dynsym, dynStrTab))
+
+    for (sym_section, lookup) in queue:
         if not sym_section:
             continue
         offs, size = sym_section

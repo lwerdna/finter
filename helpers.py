@@ -138,7 +138,7 @@ def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
 # convenience stuff
 #------------------------------------------------------------------------------
 
-def find_dissector(fpath):
+def find_dissector(fpath, offset=0):
     """ given a file path, return a dissector function """
 
     # first try if `file` will help us
@@ -152,7 +152,8 @@ def find_dissector(fpath):
         (r'MS-DOS executable', exe.analyze),
         (r'Mach-O ', macho.analyze),
         (r'RIFF \(little-endian\) data, WAVE audio', wav.analyze),
-        (r'^COMBO_BOOT', combo_boot.analyze)
+        (r'^COMBO_BOOT', combo_boot.analyze),
+        (r'u-boot legacy uImage', uboot.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
@@ -164,7 +165,10 @@ def find_dissector(fpath):
             break
 
     # next see if a file sample might help us
-    sample = open(fpath, 'rb').read(32)
+    with open(fpath, 'rb') as fp:
+        fp.seek(offset)
+        sample = fp.read(32)
+
     if sample.startswith(b'COMBO_BOOT\x00\x00'):
         analyze = combo_boot.analyze
     if sample.startswith(b'AVB0'):
@@ -182,7 +186,7 @@ def find_dissector(fpath):
 
     return analyze
 
-def dissect_file(fpath, populate_fragments=True):
+def dissect_file(fpath, initial_offset=0, populate_fragments=True):
     """ identify file path, call dissector """
 
     analyze = find_dissector(fpath)

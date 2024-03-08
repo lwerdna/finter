@@ -91,12 +91,16 @@ def oha(data, addr, comment=None):
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('ERROR: missing file parameter')
-        print('usage: %s <file>' % sys.argv[0])
+        print('usage: %s <file> [offset]' % sys.argv[0])
         sys.exit(-1)
 
     fpath = sys.argv[1]
 
-    interval_tree = dissect_file(fpath)
+    offset = 0
+    if sys.argv[2:]:
+        offset = int(sys.argv[2], 16)
+
+    interval_tree = dissect_file(fpath, offset)
 
     root = interval_tree_to_hierarchy(interval_tree, OHANode)
 
