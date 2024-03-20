@@ -173,6 +173,8 @@ def find_dissector(fpath, offset=0):
         analyze = combo_boot.analyze
     if sample.startswith(b'AVB0'):
         analyze = avb.analyze
+    if sample[4:8] == b'\x01\x00\x41\x54':
+        analyze = atags.analyze
 
     # next guess based on file name or extension
     if not analyze:
