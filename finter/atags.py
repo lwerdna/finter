@@ -30,11 +30,11 @@ class TAGID(Enum):
 
 def tag_atag_header(fp, rewind=False):
     base = fp.tell()
-    tag(fp, 8, 'atag_header', True)
+    tag(fp, 8, 'header', True)
     size = tagUint32(fp, 'size', '(in 4-byte dwords)')
     tag_id = tagUint32(fp, 'id', lambda x: enum_int_to_name(TAGID, x))
     if rewind:
-        fseek(base)
+        fp.seek(base)
     return size, tag_id
 
 def tag_atag_core(fp):
@@ -117,30 +117,35 @@ def tag_atag(fp):
     ATAG_VIDEOLFB = 0x54410008
     ATAG_CMDLINE = 0x54410009
 
-    foo = TAGID(tag_id)
-    match foo:
-        case TAGID.ATAG_CORE:
-            tag_atag_core(fp)
-        case TAGID.ATAG_MEM:
-            tag_atag_mem(fp)
-        case TAGID.ATAG_VIDEOTEXT:
-            tag_atag_videotext(fp)
-        case TAGID.ATAG_RAMDISK:
-            tag_atag_ramdisk(fp)
-        case TAGID.ATAG_INITRD2:
-            tag_atag_initrd2(fp)
-        case TAGID.ATAG_SERIAL:
-            tag_atag_serialnr(fp)
-        case TAGID.ATAG_REVISION:
-            tag_atag_revision(fp)
-        case TAGID.ATAG_VIDEOLFB:
-            tag_atag_videolfb(fp)
-        case TAGID.ATAG_CMDLINE:
-            tag_atag_cmdline(fp)
-        case TAGID.ATAG_NONE:
-            tag_atag_none(fp)
+    if tag_id in [x.value for x in TAGID]:
+        foo = TAGID(tag_id)
+        match foo:
+            case TAGID.ATAG_CORE:
+                tag_atag_core(fp)
+            case TAGID.ATAG_MEM:
+                tag_atag_mem(fp)
+            case TAGID.ATAG_VIDEOTEXT:
+                tag_atag_videotext(fp)
+            case TAGID.ATAG_RAMDISK:
+                tag_atag_ramdisk(fp)
+            case TAGID.ATAG_INITRD2:
+                tag_atag_initrd2(fp)
+            case TAGID.ATAG_SERIAL:
+                tag_atag_serialnr(fp)
+            case TAGID.ATAG_REVISION:
+                tag_atag_revision(fp)
+            case TAGID.ATAG_VIDEOLFB:
+                tag_atag_videolfb(fp)
+            case TAGID.ATAG_CMDLINE:
+                tag_atag_cmdline(fp)
+            case TAGID.ATAG_NONE:
+                tag_atag_none(fp)
 
-    return foo == TAGID.ATAG_NONE
+        return foo == TAGID.ATAG_NONE
+    else:
+        tag(fp, size*4, f'atag_unknown_{tag_id:08X}', True)
+        tag_atag_header(fp)
+        tag(fp, size*4 - 8, 'body')
 
 def analyze(fp):
     setLittleEndian()
