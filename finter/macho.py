@@ -508,7 +508,7 @@ def tag_relocation_info(fp, cputype, sym_table_names, comment=''):
 
 def analyze(fp):
     # sample the header for sane values
-    magic = uint32(fp)
+    magic = uint32(fp, True)
 
     if magic in [MH_MAGIC_64, MH_MAGIC]:
         setLittleEndian()
