@@ -153,7 +153,8 @@ def find_dissector(fpath, offset=0):
         (r'Mach-O ', macho.analyze),
         (r'RIFF \(little-endian\) data, WAVE audio', wav.analyze),
         (r'^COMBO_BOOT', combo_boot.analyze),
-        (r'u-boot legacy uImage', uboot.analyze)
+        (r'u-boot legacy uImage', uboot.analyze),
+        (r'pcapng capture file', pcapng.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
@@ -185,6 +186,8 @@ def find_dissector(fpath, offset=0):
             analyze = ihx.analyze
         elif fpath.endswith('.mkv'):
             analyze = mkv.analyze
+        elif fpath.endswith('.pcapng'):
+            analyze = pcapng.analyze
 
     return analyze
 
