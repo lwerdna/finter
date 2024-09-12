@@ -255,11 +255,11 @@ def dataUntil(FP, terminator, peek=0):
 # taggers
 ###############################################################################
 
-def tag(FP, length, comment, rewind=0):
+def tag(FP, length, name, comment='', rewind=0):
     pos = FP.tell()
     val = FP.read(length)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) raw %s' % (pos, pos+length, comment))
+    print('[0x%X,0x%X) raw %s %s' % (pos, pos+length, name, comment))
     if rewind: FP.seek(pos)
     return val
 
