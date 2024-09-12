@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import io
 import sys
 import enum
 import types
@@ -97,13 +98,20 @@ def IsEof(FP):
     FP.seek(temp)
     return answer
 
+def remaining(FP):
+    a = FP.tell()
+    FP.seek(0, io.SEEK_END);
+    b = FP.tell()
+    FP.seek(a, io.SEEK_SET);
+    return b-a
+
 def peek(FP, amt):
     value = FP.read(amt)
-    FP.seek(-amt, 1)
+    FP.seek(-amt, io.SEEK_CUR)
     return value
 
 def rewind(FP, amt):
-	FP.seek(-amt, 1)
+	FP.seek(-amt, io.SEEK_CUR)
 
 ###############################################################################
 # endianness

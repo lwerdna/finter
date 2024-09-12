@@ -4,7 +4,7 @@
 
 import re
 import sys
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode
+from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode, handle_argv_common_utility
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -89,18 +89,15 @@ def oha(data, addr, comment=None):
     return '\n'.join(result)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('ERROR: missing file parameter')
-        print('usage: %s <file> [offset]' % sys.argv[0])
-        sys.exit(-1)
+    dissector, fpath, offset = handle_argv_common_utility()
 
-    fpath = sys.argv[1]
+    if not fpath:
+        sys.exit(0)
 
-    offset = 0
-    if sys.argv[2:]:
-        offset = int(sys.argv[2], 16)
-
-    interval_tree = dissect_file(fpath, offset)
+    print(f'dissector: {dissector}')
+    interval_tree = dissect_file(fpath, offset, dissector)
+    if not interval_tree:
+        sys.exit(0)
 
     root = interval_tree_to_hierarchy(interval_tree, OHANode)
 
@@ -111,7 +108,7 @@ if __name__ == '__main__':
         graph(root)
         sys.exit(-1)
 
-    with open(sys.argv[1], 'rb') as fp:
+    with open(fpath, 'rb') as fp:
         root.set_fp(fp)
 
         for child in sorted_children:

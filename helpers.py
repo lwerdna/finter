@@ -138,11 +138,12 @@ def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
 # convenience stuff
 #------------------------------------------------------------------------------
 
-def find_dissector(fpath, offset=0):
+def find_dissector(fpath, offset=0, failure_actions=[]):
     """ given a file path, return a dissector function """
 
-    # first try if `file` will help us
-    sig2dissector = [
+    # TECHNIQUE 1: match on output of `file`
+    #
+    sig2analyze = [
         (r'GPG symmetrically encrypted data', gpg.analyze),
         (r'ELF 32-bit (LSB|MSB)', elf32.analyze),
         (r'ELF 64-bit (LSB|MSB)', elf64.analyze),
@@ -159,25 +160,28 @@ def find_dissector(fpath, offset=0):
 
     (file_str, _) = shellout(['file', fpath])
     analyze = None
-    for (sig, dissector) in sig2dissector:
+    for (sig, dissector) in sig2analyze:
         if re.search(sig, file_str):
             #print('matched on %s' % sig)
             analyze = dissector
             break
 
-    # next see if a file sample might help us
-    with open(fpath, 'rb') as fp:
-        fp.seek(offset)
-        sample = fp.read(32)
+    # TECHNIQUE 2: sample some bytes from the file
+    #
+    if not analyze:
+        with open(fpath, 'rb') as fp:
+            fp.seek(offset)
+            sample = fp.read(32)
 
-    if sample.startswith(b'COMBO_BOOT\x00\x00'):
-        analyze = combo_boot.analyze
-    if sample.startswith(b'AVB0'):
-        analyze = avb.analyze
-    if sample[4:8] == b'\x01\x00\x41\x54':
-        analyze = atags.analyze
+        if sample.startswith(b'COMBO_BOOT\x00\x00'):
+            analyze = combo_boot.analyze
+        if sample.startswith(b'AVB0'):
+            analyze = avb.analyze
+        if sample[4:8] == b'\x01\x00\x41\x54':
+            analyze = atags.analyze
 
-    # next guess based on file name or extension
+    # TECHNIQUE 3: guess based on file extension
+    #
     if not analyze:
         if fpath.endswith('.rel'):
             if re.match(r'[XDQ][HL][234]\x0a', sample.decode('utf-8')):
@@ -189,12 +193,39 @@ def find_dissector(fpath, offset=0):
         elif fpath.endswith('.pcapng'):
             analyze = pcapng.analyze
 
+    if not analyze:
+        if 'print' in failure_actions:
+            print(f'ERROR: unable to infer analyze function for "{fpath}"', file=sys.stderr)
+        if 'exit' in failure_actions:
+            sys.exit(-1)
+
     return analyze
 
-def dissect_file(fpath, initial_offset=0, populate_fragments=True):
-    """ identify file path, call dissector """
+# 'pe32' -> finter.pe32.analyze
+def lookup_analyze_function(dissector_name, failure_actions=[]):
+    if module := sys.modules.get('finter.' + dissector_name):
+        return module.analyze
 
-    analyze = find_dissector(fpath)
+    if 'print' in failure_actions:
+        print(f'ERROR: unable to locate dissector module "{dissector_name}"', file=sys.stderr)
+    if 'exit' in failure_actions:
+        sys.exit(-1)
+
+def dissect_file(fpath, initial_offset=0, dissector_name=''):
+    """ identify file, call dissector """
+
+    # find analyze function
+    analyze = None
+
+    # if user says analyze with "pe32", try to get module 'finter.pe32' .analyze
+    if dissector_name:
+        if (analyze := lookup_analyze_function(dissector_name, ['print'])) is None:
+            return
+
+    # else try to infer dissector from file
+    if not analyze:
+        analyze = find_dissector(fpath, initial_offset)
+
     if not analyze:
         return
 
@@ -208,6 +239,7 @@ def dissect_file(fpath, initial_offset=0, populate_fragments=True):
     # call analyzer
     lines = ''
     with open(fpath, 'rb') as fp:
+        fp.seek(initial_offset)
         analyze(fp)
         lines = buf.getvalue()
 
@@ -228,3 +260,34 @@ def finter_type_to_struct_fmt(type_):
     # currently they're 1:1
     assert type_ in {'B', '<B', '>B', 'H', '<H', '>H', 'W', '<W', '>W', 'I', '<I', '>I', 'Q', '<Q', '>Q'}
     return type_
+
+def handle_argv_common_utility():
+    dissector, fpath, offset = None, None, 0
+
+    if len(sys.argv) < 2:
+        print('ERROR: missing file parameter')
+        print('usage:')
+        print('    %s [dissector] <file> [offset]' % sys.argv[0])
+        print('')
+        print('where offset is given in hex')
+    else:
+        if len(sys.argv)-1 == 1:
+            # ./finter file.bin
+            fpath = sys.argv[1]
+        elif len(sys.argv)-1 == 2:
+            # ./finter file.bin 0x10
+            if os.path.isfile(sys.argv[1]):
+                fpath = sys.argv[1]
+                offset = int(sys.argv[2], 16)
+            # ./finter pe32 file.bin
+            else:
+                if os.path.isfile(sys.argv[2]):
+                    dissector = sys.argv[1]
+                    fpath = sys.argv[2]
+        else:
+            # ./finter pe32.bin file.bin 0x10
+            dissector = sys.argv[1]
+            fpath = sys.argv[2]
+            dissector = sys.argv[3]
+
+    return dissector, fpath, offset
