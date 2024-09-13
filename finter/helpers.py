@@ -263,6 +263,15 @@ def tag(FP, length, name, comment='', rewind=0):
     if rewind: FP.seek(pos)
     return val
 
+def tagFromPosition(FP, position, name, comment=''):
+    length = FP.tell() - position
+    FP.seek(position)
+    return tag(FP, length, name, comment)
+
+def tagToPosition(FP, position, name, comment=''):
+    length = position - fp.tell()
+    return tag(FP, length, name, comment)
+
 def tagUint8(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint8(FP, peek)
