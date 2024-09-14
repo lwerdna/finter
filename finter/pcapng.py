@@ -3,7 +3,11 @@
 # 
 # https://github.com/pcapng/pcapng/
 # https://github.com/IETF-OPSAWG-WG/draft-ietf-opsawg-pcap
+# https://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html
 
+VERIFY_2ND_TOTALBLOCKLENGTH = True
+
+import io
 import sys
 import struct
 import binascii
@@ -42,23 +46,24 @@ def linktype_tostr(lt):
 ###############################################################################
 
 def tag_block_header(fp):
+    global VERIFY_2ND_TOTALBLOCKLENGTH
+
     start = fp.tell()
     type_ = tagUint32(fp, 'Type', lambda x: block_id_tostr(x))
-    length = tagUint32(fp, 'TotalLength')
+    BlockTotalLength = tagUint32(fp, 'BlockTotalLength')
 
     # check the second TotalLength field
-    here = fp.tell()
-    fp.seek(length)
-    #assert uint32(fp, True) == length
-    fp.seek(here)
-
-    #tagUint32(fp, 'TotalLength (repeated)')
+    if VERIFY_2ND_TOTALBLOCKLENGTH:
+        here = fp.tell()
+        fp.seek(BlockTotalLength-12, io.SEEK_CUR)
+        assert uint32(fp) == BlockTotalLength
+        fp.seek(here)
 
     tagFromPosition(fp, start, 'BlockHeader')
 
-    return length
+    return BlockTotalLength
 
-def tag_section_header_block(fp, length):
+def tag_section_header_block(fp, BlockTotalLength):
     start = fp.tell()
     tag_block_header(fp)
 
@@ -68,28 +73,27 @@ def tag_section_header_block(fp, length):
     minor_version = tagUint16(fp, 'MinorVersion')
     section_length = tagUint64(fp, 'SectionLength')
 
-    # minus 12 for the block header type, length, length
-    # minus 16 for the bom, major_version, minor_version
-    tag(fp, length-12-16, 'Options')
+    optionsLength = BlockTotalLength - (fp.tell() - start) - 4 # -4 for 2nd BlockTotalLength
+    tag(fp, optionsLength, 'Options')
 
-    tagUint32(fp, 'TotalLength (repeated)')
+    tagUint32(fp, 'BlockTotalLength (repeated)')
 
     tagFromPosition(fp, start, 'SectionHeaderBlock')
 
-def tag_interface_description_block(fp, length):
+def tag_interface_description_block(fp, BlockTotalLength):
     start = fp.tell()
     tag_block_header(fp)
 
     tagUint16(fp, 'LinkType', lambda x: linktype_tostr(x))
     tagUint16(fp, 'Reserved')
     tagUint32(fp, 'SnapLen')
-    tag(fp, length - 8, 'Options')
+    tag(fp, BlockTotalLength -4 -4 -2 -2 -4 -4, 'Options')
 
     tagUint32(fp, 'TotalLength (repeated)')
 
     tagFromPosition(fp, start, 'InterfaceDescriptionBlock')
 
-def tag_enhanced_packet_block(fp, length):
+def tag_enhanced_packet_block(fp, BlockTotalLength):
     start = fp.tell()
     tag_block_header(fp)
 
@@ -102,8 +106,7 @@ def tag_enhanced_packet_block(fp, length):
     packetDataLength = 4 * ((capturedPacketLength+3) // 4)
     tag(fp, packetDataLength, 'packetData')
 
-    optionsLength = length + 8 - (fp.tell() - start)
-    print(f'optionsLength: {optionsLength}')
+    optionsLength = BlockTotalLength - (fp.tell() - start) - 4 # -4 for the 2nd BlockTotalLength
     assert optionsLength >= 0
     if optionsLength:
         tag(fp, 'Options', optionsLength)
@@ -121,29 +124,27 @@ def tag_block(fp):
 
     extra = ''
 
-    type_, total_length0 = struct.unpack('<II', peek(fp, 8))
+    BlockType, BlockTotalLength = struct.unpack('<II', peek(fp, 8))
 
     # BlockType   (4)
     # BodyLength  (4)
-    # Body        (<BodyLength)
-    # BodyLength  (4)            (yes, repeated)
+    # Body        (<BodyLength>)
+    # BodyLength  (4)            (yes, this value is actually repeated)
 
-    body_length = total_length0 - 12
-    if body_length:
-        # section header block
-        if type_ == 0x0a0d0d0a:
-            tag_section_header_block(fp, body_length)
-        # interface description block
-        elif type_ == 1:
-            tag_interface_description_block(fp, body_length)
-        # enahnced packet block
-        elif type_ == 6:
-            tag_enhanced_packet_block(fp, body_length)
-            frame_index += 1
-            extra = f' (index: {frame_index})'
-        else:
-            body = tag(fp, body_length, f'body{extra}')
-            #tagUint32(fp, 'TotalLength (repeated)')
+    # section header block
+    if BlockType == 0x0a0d0d0a:
+        tag_section_header_block(fp, BlockTotalLength)
+    # interface description block
+    elif BlockType == 1:
+        tag_interface_description_block(fp, BlockTotalLength)
+    # enahnced packet block
+    elif BlockType == 6:
+        tag_enhanced_packet_block(fp, BlockTotalLength)
+        frame_index += 1
+        extra = f' (index: {frame_index})'
+    else:
+        body = tag(fp, BlockTotalLength, f'body{extra}')
+        #tagUint32(fp, 'TotalLength (repeated)')
 
 def analyze(fp):
     global frame_index
