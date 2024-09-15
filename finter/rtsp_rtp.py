@@ -43,6 +43,25 @@ def seek_nalu(fp):
 def tag_rtp(fp, length):
     start = fp.tell()
 
+    # RTP HEADER (no extension)
+    # 00: flags         (1)
+    # 01: payload type  (1)
+    # 02: sequence num  (2)
+    # 04: timestamp     (4)
+    # 08: synch         (4)
+    # 12: payload       (?)
+    #
+    # RTP HEADER (with extensions)
+    # 00: flags         (1) (flags & 0x10)
+    # 01: payload type  (1)
+    # 02: sequence num  (2)
+    # 04: timestamp     (4)
+    # 08: synch         (4)
+    # 12: extension_id  (2)
+    # 14: extension_len (2)
+    # 16: extensions    (4*extension_len)
+    # ??: payload       (?)
+
     flags = tagUint8(fp, 'flags')
     ptype = tagUint8(fp, 'payload_type')
     tagUint16(fp, 'sequence_num')
@@ -60,17 +79,18 @@ def tag_rtp(fp, length):
         payload_length = length - 12
 
     # is padding present?
+    padlen = 0
     if flags & 0x20:
         tmp = fp.tell()
         fp.seek(payload_length - 1, io.SEEK_CUR)
         padlen = uint8(fp)
         assert padlen in [1, 2, 3]
-        fp.seek(-padlen, io.SEEK_CUR)
-        tag(fp, padlen, 'padding')
         payload_length -= padlen
         fp.seek(tmp)
     
     tag(fp, payload_length, 'payload')
+    if padlen:
+        tag(fp, padlen, 'padding')
 
     tagFromPosition(fp, start, 'RTP')
 
@@ -79,7 +99,8 @@ def tag_rtp(fp, length):
 def tag_rtsp(fp):
     start = fp.tell()
 
-    tagUint8(fp, 'magic')
+    if (magic := tagUint8(fp, 'magic')) != 0x24:
+        raise Exception(f'got magic byte: 0x{magic:X} (expected 0x24)')
     tagUint8(fp, 'channel')
     payload_len = tagUint16(fp, 'payload_len')
 
