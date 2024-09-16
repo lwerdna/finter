@@ -19,8 +19,8 @@ def nalu_type_to_str(x):
         case 4: return 'Coded slice data partition C (VCL)'
         case 5: return 'Coded slice of an IDR picture (VCL)'
         case 6: return 'Supplemental enhancement information (SEI) (non-VCL)'
-        case 7: return 'Sequence parameter set (non-VCL)'
-        case 8: return 'Picture parameter set (non-VCL)'
+        case 7: return 'Sequence parameter set (SPS) (non-VCL)'
+        case 8: return 'Picture parameter set (PPS) (non-VCL)'
         case 9: return 'Access unit delimiter (non-VCL)'
         case 10: return 'End of sequence (non-VCL)'
         case 11: return 'End of stream (non-VCL)'
@@ -36,16 +36,14 @@ def nalu_type_to_str(x):
         case 21: return 'Coded slice extension for depth view components (non-VCL)'
         case 22: return 'Reserved'
         case 23: return 'Reserved'
-        case 24: return 'Unspecified'
-        case 25: return 'Unspecified'
-        case 26: return 'Unspecified'
-        case 27: return 'Unspecified'
-        case 28: return 'Unspecified'
-        case 29: return 'Unspecified'
-        case 30: return 'Unspecified'
-        case 31: return 'Unspecified'
-        case 24: return 'stap_a'
-        case 28: return 'fu_a'
+        case 24: return 'STAP-A'
+        case 25: return 'STAP-B'
+        case 26: return 'MTAP16'
+        case 27: return 'MTAP24'
+        case 28: return 'FU-A'
+        case 29: return 'FU-B'
+        case 30: return 'reserved'
+        case 31: return 'reserved'
         case _: return '(unknown)'
 
 # assumes fp is positioned at a start code
@@ -64,7 +62,7 @@ def seek_nalu(fp):
         sclen = 4
     if sclen is None:
         raise Exception(f'expected start code at offset 0x{home:X}')
-   
+
     # find next start code
     end = buffer.find(b'\x00\x00\x01', sclen)
     if end == -1:
@@ -78,16 +76,51 @@ def seek_nalu(fp):
     fp.seek(home, io.SEEK_SET)
     return (sclen, nalu_len)
 
+def tag_nalu_fu_a(fp, length):
+    b0 = int.from_bytes(tag(fp, 1, 'fu_indicator', ''), 'big')
+    b1 = int.from_bytes(peek(fp, 1), 'big')
+    # +---------------+
+    # |0|1|2|3|4|5|6|7|
+    # +-+-+-+-+-+-+-+-+
+    # |S|E|R|  Type   |
+    # +---------------+
+    s = bool(b1 & 0x80)
+    e = bool(b1 & 0x40)
+    r = bool(b1 & 0x20)
+    ftype = b1 & 0x1F
+    comms = []
+    comms.append('S=1 (start)' if s else 'S=0')
+    comms.append('E=1 (end)' if e else 'E=0')
+    assert r == 0
+    comms.append('R=0')
+    comms.append(f'type=%d (%s)' % (ftype, nalu_type_to_str(ftype)))
+    tag(fp, 1, 'fu_header %s' % ' '.join(comms))
+
+    #
+    tag(fp, length-2, 'fu_payload')
+
 def tag_nalu(fp, length):
-    b0 = int.from_bytes(peek(fp, 1), 'big')
-    forbidden_zero_bit = b0 >> 7
-    nal_ref_idc = (b0 & 0x6) >> 5
-    nal_unit_type = b0 & 0x1F
+    sample = peek(fp, 2)
 
+    # +---------------+
+    # |0|1|2|3|4|5|6|7|
+    # +-+-+-+-+-+-+-+-+
+    # |F|NRI|  Type   |
+    # +---------------+
+    forbidden_zero_bit = sample[0] >> 7
     assert forbidden_zero_bit == 0
+    nal_ref_nri = (sample[0] & 0x6) >> 5
+    nal_unit_type = sample[0] & 0x1F
 
-    tag(fp, 1, 'byte0', f'nri={nal_ref_idc} type={nal_unit_type}', 1)
-    tag(fp, length, 'nalu', '('+nalu_type_to_str(nal_unit_type)+')')
+    if nal_unit_type == 28:
+        tag_nalu_fu_a(fp, length)
+    else:
+        tag(fp, 1, 'byte0', f'nri={nal_ref_nri} type={nal_unit_type}', 1)
+
+        comment = '(%s), %d (0x%X) bytes' % \
+            (nalu_type_to_str(nal_unit_type), length, length)
+
+        tag(fp, length, 'NALU', comment)
 
 ###############################################################################
 # "main"
