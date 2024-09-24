@@ -117,6 +117,8 @@ def rewind(FP, amt):
 # endianness
 ###############################################################################
 
+endian = 'little'
+
 # default to little-endian
 fmtu8 = '<B'
 fmt8 = '<b'
@@ -128,6 +130,9 @@ fmtu64 = '<Q'
 fmt64 = '<q'
 
 def setLittleEndian():
+    global endian
+    old = endian
+
     global fmt8, fmtu8, fmt16, fmtu16
     global fmt32, fmtu32, fmt64, fmtu64
     fmtu8 = '<B'
@@ -139,7 +144,13 @@ def setLittleEndian():
     fmtu64 = '<Q'
     fmt64 = '<q'
 
+    endian = 'little'
+    return old
+
 def setBigEndian():
+    global endian
+    old = endian
+
     global fmt8, fmtu8, fmt16, fmtu16
     global fmt32, fmtu32, fmt64, fmtu64
     fmtu8 = '>B'
@@ -150,6 +161,17 @@ def setBigEndian():
     fmt32 = '>i'
     fmtu64 = '>Q'
     fmt64 = '>q'
+
+    endian = 'big'
+    return old
+
+def setEndian(what):
+    if what == 'little':
+        return setLittleEndian()
+    elif what == 'big':
+        return setBigEndian()
+
+    raise Exception(f'unknown endian: {what}')
 
 ###############################################################################
 # data accessors
@@ -263,11 +285,13 @@ def tag(FP, length, name, comment='', rewind=0):
     if rewind: FP.seek(pos)
     return val
 
+# tag from an earlier file position to the current file position
 def tagFromPosition(FP, position, name, comment=''):
     length = FP.tell() - position
     FP.seek(position)
     return tag(FP, length, name, comment)
 
+# tag from the current file position to a later file position
 def tagToPosition(FP, position, name, comment=''):
     length = position - fp.tell()
     return tag(FP, length, name, comment)
@@ -276,56 +300,79 @@ def tagUint8(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint8(FP, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+1, fmtu8, name, val, comment))
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+1, fmtu8, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+1, fmtu8, val, comment))
     return val
 
 def tagUint16(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint16(FP, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+2, fmtu16, name, val, comment))
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+2, fmtu16, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+2, fmtu16, val, comment))
     return val
 
 def tagUint32(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint32(FP, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmtu32, name, val, comment))
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmtu32, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmtu32, val, comment))
     return val
 
 def tagUint64(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint64(FP, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+8, fmtu64, name, val, comment))
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+8, fmtu64, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+8, fmtu64, val, comment))
     return val
 
 def tagInt64(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = int64(FP, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) %s %s=%d %s' % (pos, pos+8, fmt64, name, val, comment))
+    if name:
+        print('[0x%X,0x%X) %s %s=%d %s' % (pos, pos+8, fmt64, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s %d %s' % (pos, pos+8, fmt64, val, comment))
     return val
 
 def tagUleb128(FP, name, comment='', peek=0):
     pos = FP.tell()
     (val, length) = uleb128(FP, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) uleb128 %s=0x%X %s' % (pos, pos+length, name, val, comment))
+    if name:
+        print('[0x%X,0x%X) uleb128 %s=0x%X %s' % (pos, pos+length, name, val, comment))
+    else:
+        print('[0x%X,0x%X) uleb128 0x%X %s' % (pos, pos+length, val, comment))
     return val
 
-def tagString(FP, length, comment, peek=0):
+def tagString(FP, length, name, peek=0):
     pos = FP.tell()
     val = string(FP, length, peek)
-    if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) string %s=\"%s\"' % (pos, pos+length, comment, val))
+    if name:
+        print('[0x%X,0x%X) string %s=\"%s\"' % (pos, pos+length, name, val))
+    else:
+        print('[0x%X,0x%X) string \"%s\"' % (pos, pos+length, val))
     return val
 
-def tagDataUntil(FP, term, comment, peek=0):
+def tagDataUntil(FP, term, name, comment, peek=0):
     pos = FP.tell()
     data = dataUntil(FP, term, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) raw %s' % (pos, pos+len(data), comment))
+    if name:
+        print('[0x%X,0x%X) raw %s=\"%s\" %s' % (pos, pos+len(data), name, data, comment))
+    else:
+        print('[0x%X,0x%X) raw \"%s\" %s' % (pos, pos+len(data), data, comment))
     return data
 
 ###############################################################################

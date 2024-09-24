@@ -14,32 +14,24 @@ import binascii
 from enum import Enum, auto
 
 from .helpers import *
+from . import ethernet
 
-def block_id_tostr(id_):
-    match id_:
-        case 0x0a0d0d0a:
-            return 'Section Header Block'
-        case 0x00000001:
-            return 'Interface Description Block'
-        case 0x00000006:
-            return 'Enhanced Packet Block'
-        case _:
-            return '(Unknown)'
+from enum import Enum, auto, unique
 
-def linktype_tostr(lt):
-    match lt:
-        case 0:
-            return 'LINKTYPE_NULL'
-        case 1:
-            return 'LINKTYPE_ETHERNET'
-        case 2:
-            return 'LINKTYPE_EXP_ETHERNET'
-        case 3:
-            return 'LINKTYPE_AX25'
-        case 4:
-            return 'LINKTYPE_PRONET'
-        case _:
-            return '(LINKTYPE_UNKNOWN)'
+frame_index = None
+link_type = None
+
+class BLOCK_TYPE(Enum):
+    SECTION_HEADER = 0x0a0d0d0a
+    INTERFACE_DESCRIPTION = 1
+    ENHANCED_PACKET = 6
+
+class LINKTYPE(Enum):
+    NULL = 0
+    ETHERNET = 1
+    EXP_ETHERNET = 2
+    AX25 = 3
+    PRONET = 4
 
 ###############################################################################
 # "main"
@@ -49,7 +41,7 @@ def tag_block_header(fp):
     global VERIFY_2ND_TOTALBLOCKLENGTH
 
     start = fp.tell()
-    type_ = tagUint32(fp, 'Type', lambda x: block_id_tostr(x))
+    type_ = tagUint32(fp, 'BlockType', lambda x: enum_int_to_name(BLOCK_TYPE, x))
     BlockTotalLength = tagUint32(fp, 'BlockTotalLength')
 
     # check the second TotalLength field
@@ -81,10 +73,12 @@ def tag_section_header_block(fp, BlockTotalLength):
     tagFromPosition(fp, start, 'SectionHeaderBlock')
 
 def tag_interface_description_block(fp, BlockTotalLength):
+    global link_type
+
     start = fp.tell()
     tag_block_header(fp)
 
-    tagUint16(fp, 'LinkType', lambda x: linktype_tostr(x))
+    link_type = tagUint16(fp, 'LinkType', lambda x: enum_int_to_name(LINKTYPE, x))
     tagUint16(fp, 'Reserved')
     tagUint32(fp, 'SnapLen')
     tag(fp, BlockTotalLength -4 -4 -2 -2 -4 -4, 'Options')
@@ -94,6 +88,9 @@ def tag_interface_description_block(fp, BlockTotalLength):
     tagFromPosition(fp, start, 'InterfaceDescriptionBlock')
 
 def tag_enhanced_packet_block(fp, BlockTotalLength):
+    global frame_index
+    global link_type
+
     start = fp.tell()
     tag_block_header(fp)
 
@@ -104,18 +101,20 @@ def tag_enhanced_packet_block(fp, BlockTotalLength):
     tagUint32(fp, 'OriginalPacketLength')
 
     packetDataLength = 4 * ((capturedPacketLength+3) // 4)
-    tag(fp, packetDataLength, 'packetData')
+
+    if link_type is not None and LINKTYPE(link_type) == LINKTYPE.ETHERNET:
+        ethernet.analyze(fp, packetDataLength)
+    else:
+        tag(fp, packetDataLength, 'packetData')
 
     optionsLength = BlockTotalLength - (fp.tell() - start) - 4 # -4 for the 2nd BlockTotalLength
     assert optionsLength >= 0
     if optionsLength:
-        tag(fp, 'Options', optionsLength)
+        tag(fp, optionsLength, 'Options')
 
     tagUint32(fp, 'TotalLength (repeated)')
 
     tagFromPosition(fp, start, 'Block', f'EnhancedPacketBlock (index: {frame_index})')
-
-frame_index = None
 
 def tag_block(fp):
     global frame_index

@@ -4,7 +4,7 @@ from enum import Enum, auto, unique
 from .helpers import *
 
 class DWARF_CHILD(Enum):
-    DW_CHILDREN_no = 0
+    DW_CHILDREN_NO = 0
     DW_CHILDREN_YES = 1
 
 class DWARF_TAG(Enum):
