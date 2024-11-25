@@ -326,6 +326,16 @@ def tagUint32(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmtu32, val, comment))
     return val
 
+def tagInt32(FP, name, comment='', peek=0):
+    pos = FP.tell()
+    val = int32(FP, peek)
+    if type(comment) == types.FunctionType: comment = comment(val)
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmtu32, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmtu32, val, comment))
+    return val
+
 def tagUint64(FP, name, comment='', peek=0):
     pos = FP.tell()
     val = uint64(FP, peek)

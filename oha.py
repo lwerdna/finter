@@ -94,7 +94,7 @@ if __name__ == '__main__':
     if not fpath:
         sys.exit(0)
 
-    print(f'dissector: {dissector}')
+    #print(f'dissector: {dissector}')
     interval_tree = dissect_file(fpath, offset, dissector)
     if not interval_tree:
         sys.exit(0)

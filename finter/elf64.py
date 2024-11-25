@@ -189,7 +189,7 @@ def tag_elf64_phdr(fp, index):
 
 def analyze(fp):
     if not isElf64(fp):
-           return
+        return
     tag(fp, SIZEOF_ELF64_HDR, "elf64_hdr", 1)
     tag(fp, 4, "e_ident[0..4)")
     tagUint8(fp, "e_ident[EI_CLASS] (64-bit)")

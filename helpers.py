@@ -155,7 +155,8 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
         (r'RIFF \(little-endian\) data, WAVE audio', wav.analyze),
         (r'^COMBO_BOOT', combo_boot.analyze),
         (r'u-boot legacy uImage', uboot.analyze),
-        (r'pcapng capture file', pcapng.analyze)
+        (r'pcapng capture file', pcapng.analyze),
+        (r'pcap capture file', pcap.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
