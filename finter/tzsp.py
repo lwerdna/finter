@@ -3,7 +3,7 @@
 import sys
 from enum import Enum
 
-from . import ethernet
+from . import networking
 from .helpers import *
 
 class TZSP_TYPE(Enum):
@@ -60,7 +60,7 @@ def analyze(fp, length=None):
 
     remaining = length - (fp.tell() - start)
     if proto == TZSP_PROTOCOL.ETHERNET.value:
-        ethernet.analyze(fp, remaining)
+        networking.ethernet_ii(fp, remaining)
     else:
         tag(fp, remaining, 'Payload')
 

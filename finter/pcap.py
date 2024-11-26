@@ -9,7 +9,7 @@ import binascii
 from enum import Enum, auto
 
 from .helpers import *
-from . import ethernet
+from . import networking
 
 from enum import Enum, auto, unique
 
@@ -21,19 +21,15 @@ class BLOCK_TYPE(Enum):
     INTERFACE_DESCRIPTION = 1
     ENHANCED_PACKET = 6
 
-# TODO: populate with more from pcap/dlt.h
-class LINKTYPE(Enum):
-    NULL = 0
-    ETHERNET = 1
-    EXP_ETHERNET = 2
-    AX25 = 3
-    PRONET = 4
-
 ###############################################################################
 # "main"
 ###############################################################################
 
+linktype = None
+
 def tag_global_header(fp):
+    global linktype
+
     start = fp.tell()
     tagUint32(fp, 'magic', 'magic number')
     tagUint16(fp, 'version_major', 'major version number')
@@ -41,7 +37,7 @@ def tag_global_header(fp):
     tagInt32(fp, 'thiszone', 'GMT to local correction')
     tagUint32(fp, 'sigfigs', 'accuracy of timestamps')
     tagUint32(fp, 'snaplen', 'max length of captured packets')
-    tagUint32(fp, 'network', lambda x: enum_int_to_name(LINKTYPE, x))
+    linktype = tagUint32(fp, 'network', lambda x: enum_int_to_name(networking.LINKTYPE, x))
     tagFromPosition(fp, start, 'pcap_hdr_t')
 
 t0 = None
@@ -64,6 +60,8 @@ def tag_record_header(fp):
     return length
 
 def analyze(fp):
+    global linktype
+
     setLittleEndian()
 
     magic = uint32(fp, True)
@@ -78,7 +76,12 @@ def analyze(fp):
 
     while not IsEof(fp):
         length = tag_record_header(fp)
-        tag(fp, length, 'packet data', f'({length:d} bytes)')
+
+        if linktype == networking.LINKTYPE.LINUX_SLL2.value:
+            networking.linux_sll2(fp)
+            tag(fp, length-20, 'payload')
+        else:
+            tag(fp, length, 'packet data', f'({length:d} bytes)')
 
 if __name__ == '__main__':
     import sys

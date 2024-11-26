@@ -119,3 +119,10 @@ Dissectors do not have to worry about ordering or providing hierarchical informa
 000002B0: 74 61 72 74 5F 5F 00                             tart__.
 ...
 ```
+
+# Dev Notes
+
+Test an individual dissector without stdout capture:
+```
+python -m finter.pcap ~/repos/lwerdna/filesamples/simple_http_sll2.pcap
+```

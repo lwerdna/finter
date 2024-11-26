@@ -14,7 +14,7 @@ import binascii
 from enum import Enum, auto
 
 from .helpers import *
-from . import ethernet
+from . import networking
 
 from enum import Enum, auto, unique
 
@@ -103,7 +103,7 @@ def tag_enhanced_packet_block(fp, BlockTotalLength):
     packetDataLength = 4 * ((capturedPacketLength+3) // 4)
 
     if link_type is not None and LINKTYPE(link_type) == LINKTYPE.ETHERNET:
-        ethernet.analyze(fp, packetDataLength)
+        networking.ethernet_ii(fp, packetDataLength)
     else:
         tag(fp, packetDataLength, 'packetData')
 
