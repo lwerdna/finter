@@ -100,6 +100,8 @@ class ARP_HARDWARE(Enum):
     ARPHRD_NONE = 0xFFFE
 
 def ethernet_ii(fp, length=None, descend=False):
+    print(f'// ethernet_ii(length={length}/0x{length:x})')
+
     endian = setBigEndian()
 
     mark = fp.tell()
@@ -127,6 +129,8 @@ def ethernet_ii(fp, length=None, descend=False):
     setEndian(endian)
 
 def ethernet_802_3(fp, length=None, descend=False):
+    print('// ethernet_802_3()')
+
     endian = setBigEndian()
 
     mark = fp.tell()
@@ -148,6 +152,8 @@ def ethernet_802_3(fp, length=None, descend=False):
     setEndian(endian)
 
 def ethernet(fp, length=None, descend=False):
+    print('// ethernet()')
+
     # there are multiple ethernet frames:
     # - Ethernet II
     # - Novell raw IEEE 802.3
@@ -187,6 +193,8 @@ def ip2str(data):
     return f'%d.%d.%d.%d' % (data[0], data[1], data[2], data[3])
 
 def ipv4(fp, length=None, descend=False):
+    print(f'// ipv4(length={length}/0x{length:x}, descend={descend})')
+
     endian = setBigEndian()
 
     mark = fp.tell()
@@ -201,7 +209,7 @@ def ipv4(fp, length=None, descend=False):
     ECN = tmp & 0x3
     tagUint8(fp, '', lambda x: f'DSCP=0x{DSCP:X} ECN=0x{ECN:X}')
 
-    tagUint16(fp, 'TotalLength')
+    TotalLength = tagUint16(fp, 'TotalLength')
 
     tagUint16(fp, 'Identification')
 
@@ -234,20 +242,24 @@ def ipv4(fp, length=None, descend=False):
     descended = False
     if descend:
         if protocol == IPV4_PROTO.UDP.value:
-            udp(fp, length - offs, descend=descend)
+            udp(fp, TotalLength - offs, descend=descend)
             descended = True
-        # TODO: tcp analyze
+        # TODO: handle TCP
 
     if not descended:
-        fp.seek(length - offs, io.SEEK_CUR)
+        fp.seek(TotalLength - offs, io.SEEK_CUR)
 
     tagFromPosition(fp, mark, 'ipv4 payload')
 
+    if length > TotalLength:
+        tag(fp, length-TotalLength, 'ipv4 payload (gap)')
+
     setEndian(endian)
 
-#
 # length: of data to follow, including udp header
 def udp(fp, length=None, descend=False):
+    print(f'// udp(length={length}/0x{length:x})')
+
     endian = setBigEndian()
 
     if length < 8:
@@ -258,11 +270,12 @@ def udp(fp, length=None, descend=False):
     mark = fp.tell()
     tagUint16(fp, 'SrcPort', lambda x: f'({x:d})')
     tagUint16(fp, 'DstPort', lambda x: f'({x:d})')
-    length_udp_payload_declared = tagUint16(fp, 'Length', lambda x: f'({x:d})')
+    length_udp = tagUint16(fp, 'Length', lambda x: f'({x:d})') # includes UDP header
     tagUint16(fp, 'Checksum')
     tagFromPosition(fp, mark, 'udp header')
 
     # double check payload size from container (probably IP) and UDP
+    length_udp_payload_declared = length_udp - 8
     length_udp_payload_calculated = length - 8
     delta = length_udp_payload_calculated - length_udp_payload_declared
 
@@ -280,7 +293,7 @@ def udp(fp, length=None, descend=False):
             sample = peek(fp, 5)
             # guess TZSP ver=1 type=0 (rx'd pkt) proto=Ether no tags
             if sample == b'\x01\x00\x00\x01\x01':
-                tzsp.analyze(fp, length-8, descend=descend)
+                tzsp(fp, length-8, descend=descend)
                 descended = True
 
         if not descended:
@@ -292,6 +305,8 @@ def udp(fp, length=None, descend=False):
 
 # https://www.tcpdump.org/linktypes/LINKTYPE_LINUX_SLL2.html
 def linux_sll2(fp, descend=False):
+    print('// linux_sll2()')
+
     endian = setBigEndian()
 
     start = fp.tell()
@@ -340,6 +355,8 @@ class TZSP_TAG_TYPE(Enum):
     WLAN_RADIO_HDR_SERIAL = 60
 
 def tzsp(fp, length=None, descend=False):
+    print(f'// tzsp(length={length}/0x{length:x})')
+
     endian = setBigEndian()
 
     mark = fp.tell()
@@ -363,10 +380,15 @@ def tzsp(fp, length=None, descend=False):
     remaining = length - (fp.tell() - mark)
 
     mark = fp.tell()
+
+    descended = False
     if descend:
         if proto == TZSP_PROTOCOL.ETHERNET.value:
-            networking.ethernet(fp, remaining, descend=descend)
-    else:
-        tag(fp, remaining, 'tzsp payload')
+            ethernet(fp, remaining, descend=descend)
+            descended = True
+    if not descended:
+        fp.seek(remaining, io.SEEK_CUR)
+
+    tagFromPosition(fp, mark, 'tzsp payload')
 
     setEndian(endian)

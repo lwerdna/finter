@@ -88,6 +88,8 @@ def tag_interface_description_block(fp, BlockTotalLength):
     tagFromPosition(fp, start, 'InterfaceDescriptionBlock')
 
 def tag_enhanced_packet_block(fp, BlockTotalLength):
+    print('// tag_enhanced_packet_block()')
+
     global frame_index
     global link_type
 
@@ -102,10 +104,17 @@ def tag_enhanced_packet_block(fp, BlockTotalLength):
 
     packetDataLength = 4 * ((capturedPacketLength+3) // 4)
 
+    mark = fp.tell()
     if link_type is not None and LINKTYPE(link_type) == LINKTYPE.ETHERNET:
-        networking.ethernet_ii(fp, packetDataLength)
+        networking.ethernet(fp, packetDataLength, descend=True)
     else:
-        tag(fp, packetDataLength, 'packetData')
+        tag(fp, packetDataLength, f'packetData ({packetDataLength}/0x{packetDataLength:x} bytes)')
+
+    mark2 = mark + packetDataLength
+    if fp.tell() > mark2:
+        raise Exception(f'ERROR: descent consumed {fp.tell()-mark} bytes when only {packetDataLength} were available')
+    elif fp.tell() < mark2:
+        raise Exception(f'ERROR: descent consumed {fp.tell()-mark} bytes they should have consumed {packetDataLength}')
 
     optionsLength = BlockTotalLength - (fp.tell() - start) - 4 # -4 for the 2nd BlockTotalLength
     assert optionsLength >= 0
@@ -142,7 +151,7 @@ def tag_block(fp):
         frame_index += 1
         extra = f' (index: {frame_index})'
     else:
-        body = tag(fp, BlockTotalLength, f'body{extra}')
+        body = tag(fp, BlockTotalLength, f'Block (type:{BlockType}) body{extra}')
         #tagUint32(fp, 'TotalLength (repeated)')
 
 def analyze(fp):

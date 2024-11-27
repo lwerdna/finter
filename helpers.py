@@ -32,6 +32,11 @@ def intervals_from_text(lines):
         if not line:
             continue
 
+        # comments
+        if line.startswith('//') or line.startswith('#'):
+            continue
+
+        # eg: [0x16F,0x171) >H HeaderChecksum=0xE949
         m = re.match(r'\[(.*?),(.*?)\) (.*?) (.*)', line)
         if not m:
             raise Exception('MALFORMED: %s' % line)
