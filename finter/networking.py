@@ -244,7 +244,9 @@ def ipv4(fp, length=None, descend=False):
         if protocol == IPV4_PROTO.UDP.value:
             udp(fp, TotalLength - offs, descend=descend)
             descended = True
-        # TODO: handle TCP
+        elif protocol == IPV4_PROTO.TCP.value:
+            tcp(fp, TotalLength - offs, descend=descend)
+            descended = True
 
     if not descended:
         fp.seek(TotalLength - offs, io.SEEK_CUR)
@@ -303,8 +305,51 @@ def udp(fp, length=None, descend=False):
 
     setEndian(endian)
 
+def tcp(fp, length, descend=False):
+    start = fp.tell()
+
+    tagUint16(fp, 'SrcPort')
+    tagUint16(fp, 'DstPort')
+    tagUint32(fp, 'SeqNum')
+    tagUint32(fp, 'AckNum')
+
+    tmp = uint16(fp, peek=True)
+    flags = []
+    if tmp & (1<<7):
+        flags.append('CWR')
+    if tmp & (1<<6):
+        flags.append('ECE')
+    if tmp & (1<<5):
+        flags.append('URG')
+    if tmp & (1<<4):
+        flags.append('ACK')
+    if tmp & (1<<3):
+        flags.append('PSH')
+    if tmp & (1<<2):
+        flags.append('RST')
+    if tmp & (1<<1):
+        flags.append('SYN')
+    if tmp & (1<<0):
+        flags.append('FIN')
+
+    data_offs = tmp >> 12
+    tagUint16(fp, 'octet12', f'data_offs={data_offs} {"|".join(flags)}')
+
+    tagUint16(fp, 'Window')
+    tagUint16(fp, 'Checksum')
+    tagUint16(fp, 'UrgentPtr')
+
+    options_i = 0
+    while fp.tell() < start + 4*data_offs:
+        tagUint32(fp, f'options{options_i}')
+        options_i += 1
+
+    tagFromPosition(fp, start, 'tcp header')
+
+    tag(fp, length - 4*data_offs, 'tcp payload')
+
 # https://www.tcpdump.org/linktypes/LINKTYPE_LINUX_SLL2.html
-def linux_sll2(fp, descend=False):
+def linux_sll2(fp, length, descend=False):
     print('// linux_sll2()')
 
     endian = setBigEndian()
@@ -317,7 +362,9 @@ def linux_sll2(fp, descend=False):
     tagUint8(fp, 'packet type')
     tagUint8(fp, 'link-layer address length')
     tag(fp, 8, 'link-layer address')
-    tagFromPosition(fp, start, 'linux_sll2_hdr')
+    tagFromPosition(fp, start, 'linux sll2 header')
+
+    tag(fp, length-20, 'linux sll2 payload')
 
     setEndian(endian)
 

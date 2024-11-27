@@ -81,8 +81,7 @@ def analyze(fp):
         length = tag_record_header(fp)
 
         if linktype == networking.LINKTYPE.LINUX_SLL2.value:
-            networking.linux_sll2(fp)
-            tag(fp, length-20, 'payload')
+            networking.linux_sll2(fp, length, True)
         elif linktype == networking.LINKTYPE.ETHERNET.value:
             networking.ethernet(fp, length, True)
         else:
