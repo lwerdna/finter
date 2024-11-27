@@ -118,7 +118,7 @@ def ethernet_ii(fp, length=None, descend=False):
             if ETHER_TYPE(etype) == ETHER_TYPE.ETH_P_IP:
                 ipv4(fp, length-14, descend=descend)
                 descended = True
-            
+
         if not descended:
             fp.seek(length-14, io.SEEK_CUR)
 
@@ -140,7 +140,7 @@ def ethernet_802_3(fp, length=None, descend=False):
     # > Since the recipient still needs to know how to interpret the frame, the
     # > standard required an IEEE 802.2 header to follow the length and specify
     # > the type. TODO
-    
+
     # https://en.wikipedia.org/wiki/IEEE_802.2
 
     tag(fp, length, 'ethernet 802.3 payload')
@@ -163,7 +163,7 @@ def ethernet(fp, length=None, descend=False):
     fp.seek(mark, io.SEEK_SET)
 
     # see "Ethernet Frame Differentiation" at https://en.wikipedia.org/wiki/Ethernet_frame
-    
+
     # ethernet ii
     if tmp > 0x0600:
         ethernet_ii(fp, length, descend=descend)
@@ -224,40 +224,69 @@ def ipv4(fp, length=None, descend=False):
         for i in range(0, IHL-5):
             tagUint32(fp, f'Options[{i}]')
             offs += 4
-    
+
     assert offs < length
 
     tagFromPosition(fp, mark, 'ipv4 header')
 
     mark = fp.tell()
 
+    descended = False
     if descend:
         if protocol == IPV4_PROTO.UDP.value:
             udp(fp, length - offs, descend=descend)
+            descended = True
         # TODO: tcp analyze
+
+    if not descended:
+        fp.seek(length - offs, io.SEEK_CUR)
 
     tagFromPosition(fp, mark, 'ipv4 payload')
 
     setEndian(endian)
 
+#
+# length: of data to follow, including udp header
 def udp(fp, length=None, descend=False):
     endian = setBigEndian()
+
+    if length < 8:
+        if length > 0:
+            tag(fp, length, 'truncated udp header')
+        return
 
     mark = fp.tell()
     tagUint16(fp, 'SrcPort', lambda x: f'({x:d})')
     tagUint16(fp, 'DstPort', lambda x: f'({x:d})')
-    tagUint16(fp, 'Length', lambda x: f'({x:d})')
+    length_udp_payload_declared = tagUint16(fp, 'Length', lambda x: f'({x:d})')
     tagUint16(fp, 'Checksum')
     tagFromPosition(fp, mark, 'udp header')
 
-    mark = fp.tell()
-    if descend:
-        sample = peek(fp, 5)
-        # guess TZSP ver=1 type=0 (rx'd pkt) proto=Ether no tags
-        if sample == b'\x01\x00\x00\x01\x01':
-            tzsp.analyze(fp, length-8, descend=descend)
+    # double check payload size from container (probably IP) and UDP
+    length_udp_payload_calculated = length - 8
+    delta = length_udp_payload_calculated - length_udp_payload_declared
 
-    tag(fp, length-8, 'udp payload')
+    # if the check failed, just declared payload and be done
+    if delta > 0:
+        tag(fp, length_udp_payload_declared, f'udp payload')
+        tag(fp, delta, 'udp payload (gap)')
+    elif delta < 0:
+        tag(fp, length_udp_payload_calculated, f'udp payload (truncated)')
+    # if check succeeds, risk descent
+    else:
+        mark = fp.tell()
+        descended = False
+        if descend:
+            sample = peek(fp, 5)
+            # guess TZSP ver=1 type=0 (rx'd pkt) proto=Ether no tags
+            if sample == b'\x01\x00\x00\x01\x01':
+                tzsp.analyze(fp, length-8, descend=descend)
+                descended = True
+
+        if not descended:
+            fp.seek(length_udp_payload_declared, io.SEEK_CUR)
+
+        tagFromPosition(fp, mark, 'udp payload')
 
     setEndian(endian)
 

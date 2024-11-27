@@ -41,8 +41,10 @@ def tag_global_header(fp):
     tagFromPosition(fp, start, 'pcap_hdr_t')
 
 t0 = None
+frame_no = 1
 def tag_record_header(fp):
     global t0
+    global frame_no
 
     start = fp.tell()
     ts_sec = tagUint32(fp, 'ts_sec')
@@ -56,7 +58,8 @@ def tag_record_header(fp):
 
     length = tagUint32(fp, 'incl_len')
     tagUint32(fp, 'orig_len')
-    tagFromPosition(fp, start, 'pcaprec_hdr_s', f't={delta}')
+    tagFromPosition(fp, start, 'pcaprec_hdr_s', f'No.{frame_no} t={delta}')
+    frame_no += 1
     return length
 
 def analyze(fp):
