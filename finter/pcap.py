@@ -80,6 +80,8 @@ def analyze(fp):
         if linktype == networking.LINKTYPE.LINUX_SLL2.value:
             networking.linux_sll2(fp)
             tag(fp, length-20, 'payload')
+        elif linktype == networking.LINKTYPE.ETHERNET.value:
+            networking.ethernet(fp, length, True)
         else:
             tag(fp, length, 'packet data', f'({length:d} bytes)')
 

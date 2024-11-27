@@ -6,6 +6,10 @@ from enum import Enum
 from . import networking
 from .helpers import *
 
+###############################################################################
+# TZSP https://en.wikipedia.org/wiki/TZSP
+###############################################################################
+
 class TZSP_TYPE(Enum):
     PacketReceived = 0
     PacketForTransmit = 1
@@ -35,14 +39,10 @@ class TZSP_TAG_TYPE(Enum):
     RX_FRAME_LENGTH = 41
     WLAN_RADIO_HDR_SERIAL = 60
 
-###############################################################################
-# "main"
-###############################################################################
-
-def analyze(fp, length=None):
+def tzsp(fp, length=None, descend=False):
     endian = setBigEndian()
 
-    start = fp.tell()
+    mark = fp.tell()
 
     tagUint8(fp, 'Version')
     tagUint8(fp, 'Type', lambda x: enum_int_to_name(TZSP_TYPE, x))
@@ -58,17 +58,15 @@ def analyze(fp, length=None):
             taglen = tagUint8(fp, 'TagLength')
             tag(fp, taglen, 'TagData')
 
-    remaining = length - (fp.tell() - start)
-    if proto == TZSP_PROTOCOL.ETHERNET.value:
-        networking.ethernet_ii(fp, remaining)
-    else:
-        tag(fp, remaining, 'Payload')
+    tagFromPosition(fp, mark, 'tzsp header')
 
-    tagFromPosition(fp, start, 'TZSP')
+    remaining = length - (fp.tell() - mark)
+
+    mark = fp.tell()
+    if descend:
+        if proto == TZSP_PROTOCOL.ETHERNET.value:
+            networking.ethernet_ii(fp, remaining, descend=descend)
+    else:
+        tag(fp, remaining, 'tzsp payload')
 
     setEndian(endian)
-
-if __name__ == '__main__':
-    import sys
-    with open(sys.argv[1], 'rb') as fp:
-        analyze(fp)

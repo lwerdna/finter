@@ -5,15 +5,20 @@ from enum import Enum
 
 from .helpers import *
 
-from . import ipv4
+###############################################################################
+# link layer
+###############################################################################
 
 def mac2str(data):
     return f'%02X:%02X:%02X:%02X:%02X:%02X' % (data[0], data[1], data[2], data[3], data[4], data[5])
 
 class ETHER_TYPE(Enum):
-    IPV4 = 0x0800
-    ARP = 0x0806
-    IPV6 = 0x86DD
+    ETH_P_IP = 0x0800
+    ETH_P_ARP = 0x0806
+    ETH_P_IPV6 = 0x86DD
+    ETH_P_LOOPBACK = 0x9000
+    # TODO: add the others
+    # https://github.com/torvalds/linux/blob/master/include/uapi/linux/if_ether.h
 
 # https://www.tcpdump.org/linktypes.html
 class LINKTYPE(Enum):
@@ -94,31 +99,170 @@ class ARP_HARDWARE(Enum):
     ARPHRD_VOID = 0xFFFF
     ARPHRD_NONE = 0xFFFE
 
-###############################################################################
-# "main"
-###############################################################################
-
-def ethernet_ii(fp, length=None):
+def ethernet_ii(fp, length=None, descend=False):
     endian = setBigEndian()
 
-    start = fp.tell()
+    mark = fp.tell()
 
     tag(fp, 6, 'DstMac', lambda x: mac2str(x))
     tag(fp, 6, 'SrcMac', lambda x: mac2str(x))
     etype = tagUint16(fp, 'Type', lambda x: enum_int_to_name(ETHER_TYPE, x))
 
-    if length is not None:
-        if ETHER_TYPE(etype) == ETHER_TYPE.IPV4:
-            ipv4.analyze(fp, length-14)
-        else:
-            tag(fp, length-14, 'Payload')
+    tagFromPosition(fp, mark, 'ethernet II header')
 
-    tagFromPosition(fp, start, 'EthernetII')
+    if length is not None and length-14 > 0:
+        mark = fp.tell()
+
+        descended = False
+        if descend:
+            if ETHER_TYPE(etype) == ETHER_TYPE.ETH_P_IP:
+                ipv4(fp, length-14, descend=descend)
+                descended = True
+            
+        if not descended:
+            fp.seek(length-14, io.SEEK_CUR)
+
+        tagFromPosition(fp, mark, 'ethernet II payload')
+
+    setEndian(endian)
+
+def ethernet_802_3(fp, length=None, descend=False):
+    endian = setBigEndian()
+
+    mark = fp.tell()
+
+    tag(fp, 6, 'DstMac', lambda x: mac2str(x))
+    tag(fp, 6, 'SrcMac', lambda x: mac2str(x))
+    length = tagUint16(fp, 'Length')
+
+    tagFromPosition(fp, mark, 'ethernet 802.3 header')
+
+    # > Since the recipient still needs to know how to interpret the frame, the
+    # > standard required an IEEE 802.2 header to follow the length and specify
+    # > the type. TODO
+    
+    # https://en.wikipedia.org/wiki/IEEE_802.2
+
+    tag(fp, length, 'ethernet 802.3 payload')
+
+    setEndian(endian)
+
+def ethernet(fp, length=None, descend=False):
+    # there are multiple ethernet frames:
+    # - Ethernet II
+    # - Novell raw IEEE 802.3
+    # - IEEE 802.2 Logical Link Control (LLC) TODO
+    # - IEEE 802.2 Subnetwork Access Protocol (SNAP) TODO
+
+    endian = setBigEndian()
+
+    # read the type/length field to distinguish Ethernet II from 802.3
+    mark = fp.tell()
+    fp.seek(6+6, io.SEEK_CUR)
+    tmp = uint16(fp)
+    fp.seek(mark, io.SEEK_SET)
+
+    # see "Ethernet Frame Differentiation" at https://en.wikipedia.org/wiki/Ethernet_frame
+    
+    # ethernet ii
+    if tmp > 0x0600:
+        ethernet_ii(fp, length, descend=descend)
+    # 802.3
+    else:
+        ethernet_802_3(fp, length, descend=descend)
+
+    setEndian(endian)
+
+###############################################################################
+# network layer
+###############################################################################
+
+class IPV4_PROTO(Enum):
+    ICMP = 1
+    IGMP = 2
+    TCP = 6
+    UDP = 17
+
+def ip2str(data):
+    return f'%d.%d.%d.%d' % (data[0], data[1], data[2], data[3])
+
+def ipv4(fp, length=None, descend=False):
+    endian = setBigEndian()
+
+    mark = fp.tell()
+
+    tmp = uint8(fp, True)
+    Version = tmp >> 4
+    IHL = tmp & 0xF
+    tagUint8(fp, '', lambda x: f'Version=0x{Version:X} IHL=0x{IHL:X}')
+
+    tmp = uint8(fp, True)
+    DSCP = tmp >> 2
+    ECN = tmp & 0x3
+    tagUint8(fp, '', lambda x: f'DSCP=0x{DSCP:X} ECN=0x{ECN:X}')
+
+    tagUint16(fp, 'TotalLength')
+
+    tagUint16(fp, 'Identification')
+
+    tmp = uint16(fp, True)
+    Flags = tmp >> 13
+    FragOffset = tmp & 0x1FFF
+    tagUint16(fp, '', f'Flags=0x{Flags:X} FragOffset=0x{FragOffset:X}')
+
+    tagUint8(fp, 'TTL')
+
+    protocol = tagUint8(fp, 'Protocol', lambda x: enum_int_to_name(IPV4_PROTO, x))
+
+    tagUint16(fp, 'HeaderChecksum')
+
+    tag(fp, 4, 'SrcAddr', lambda x: ip2str(x))
+    tag(fp, 4, 'DstAddr', lambda x: ip2str(x))
+
+    offs = 20
+    if IHL > 5:
+        for i in range(0, IHL-5):
+            tagUint32(fp, f'Options[{i}]')
+            offs += 4
+    
+    assert offs < length
+
+    tagFromPosition(fp, mark, 'ipv4 header')
+
+    mark = fp.tell()
+
+    if descend:
+        if protocol == IPV4_PROTO.UDP.value:
+            udp(fp, length - offs, descend=descend)
+        # TODO: tcp analyze
+
+    tagFromPosition(fp, mark, 'ipv4 payload')
+
+    setEndian(endian)
+
+def udp(fp, length=None, descend=False):
+    endian = setBigEndian()
+
+    mark = fp.tell()
+    tagUint16(fp, 'SrcPort', lambda x: f'({x:d})')
+    tagUint16(fp, 'DstPort', lambda x: f'({x:d})')
+    tagUint16(fp, 'Length', lambda x: f'({x:d})')
+    tagUint16(fp, 'Checksum')
+    tagFromPosition(fp, mark, 'udp header')
+
+    mark = fp.tell()
+    if descend:
+        sample = peek(fp, 5)
+        # guess TZSP ver=1 type=0 (rx'd pkt) proto=Ether no tags
+        if sample == b'\x01\x00\x00\x01\x01':
+            tzsp.analyze(fp, length-8, descend=descend)
+
+    tag(fp, length-8, 'udp payload')
 
     setEndian(endian)
 
 # https://www.tcpdump.org/linktypes/LINKTYPE_LINUX_SLL2.html
-def linux_sll2(fp):
+def linux_sll2(fp, descend=False):
     endian = setBigEndian()
 
     start = fp.tell()
@@ -133,7 +277,67 @@ def linux_sll2(fp):
 
     setEndian(endian)
 
-if __name__ == '__main__':
-    import sys
-    with open(sys.argv[1], 'rb') as fp:
-        analyze(fp)
+###############################################################################
+# TZSP https://en.wikipedia.org/wiki/TZSP
+###############################################################################
+
+class TZSP_TYPE(Enum):
+    PacketReceived = 0
+    PacketForTransmit = 1
+    Reserved = 2
+    Configuration = 3
+    KeepAlive = 4
+    PortOpener = 5
+
+class TZSP_PROTOCOL(Enum):
+    ETHERNET = 1
+    IEEE_802_11 = 18
+    PRISM = 119
+    WLAN_AVS = 127
+
+class TZSP_TAG_TYPE(Enum):
+    PADDING = 0
+    END = 1
+    RAW_RSSI = 10
+    SNR = 11
+    DATA_RATE = 12
+    TIMESTAMP = 13
+    CONENTION_FREE = 15
+    DECRYPTED = 16
+    FCS_ERROR = 17
+    RX_CHANNEL = 18
+    PACKET_COUNT = 40
+    RX_FRAME_LENGTH = 41
+    WLAN_RADIO_HDR_SERIAL = 60
+
+def tzsp(fp, length=None, descend=False):
+    endian = setBigEndian()
+
+    mark = fp.tell()
+
+    tagUint8(fp, 'Version')
+    tagUint8(fp, 'Type', lambda x: enum_int_to_name(TZSP_TYPE, x))
+    proto = tagUint16(fp, 'Protocol', lambda x: enum_int_to_name(TZSP_PROTOCOL, x))
+
+    while True:
+        tagType = tagUint8(fp, 'TagType', lambda x: enum_int_to_name(TZSP_TAG_TYPE, x))
+        if tagType == TZSP_TAG_TYPE.END.value:
+            break
+        elif tagType == TZSP_TAG_TYPE.PADDING.value:
+            continue
+        else:
+            taglen = tagUint8(fp, 'TagLength')
+            tag(fp, taglen, 'TagData')
+
+    tagFromPosition(fp, mark, 'tzsp header')
+
+    remaining = length - (fp.tell() - mark)
+
+    mark = fp.tell()
+    if descend:
+        if proto == TZSP_PROTOCOL.ETHERNET.value:
+            networking.ethernet(fp, remaining, descend=descend)
+    else:
+        tag(fp, remaining, 'tzsp payload')
+
+    setEndian(endian)
