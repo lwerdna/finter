@@ -355,16 +355,37 @@ def linux_sll2(fp, length, descend=False):
     endian = setBigEndian()
 
     start = fp.tell()
-    tagUint16(fp, 'protocol_type')
+    protocol_type = tagUint16(fp, 'protocol_type')
     tagUint16(fp, 'reserved (mbz)')
     tagUint32(fp, 'interface index')
-    tagUint16(fp, 'hw type', lambda x: enum_int_to_name(ARP_HARDWARE, x))
+    hw_type = tagUint16(fp, 'hw type', lambda x: enum_int_to_name(ARP_HARDWARE, x))
     tagUint8(fp, 'packet type')
     tagUint8(fp, 'link-layer address length')
     tag(fp, 8, 'link-layer address')
     tagFromPosition(fp, start, 'linux sll2 header')
 
-    tag(fp, length-20, 'linux sll2 payload')
+    descended = False
+
+    # decoding the protocol field depends on hardware type
+    if hw_type == ARP_HARDWARE.ARPHRD_IPGRE.value:
+        # protocol field contains GRE protocol type
+        pass
+    elif hw_type == ARP_HARDWARE.ARPHRD_IEEE80211_RADIOTAP.value:
+        #
+        pass
+    elif hw_type == ARP_HARDWARE.ARPHRD_FRAD.value:
+        #
+        pass
+    else:
+        if protocol_type == ETHER_TYPE.ETH_P_IP.value:
+            ipv4(fp, length-20, descend=descend)
+            descended = True
+        elif protocol_type == 0x0001:
+            # TODO: Novel 802.3
+            pass
+
+    if not descended:
+        tag(fp, length-20, 'linux sll2 payload')
 
     setEndian(endian)
 
