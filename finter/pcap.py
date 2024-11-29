@@ -41,10 +41,8 @@ def tag_global_header(fp):
     tagFromPosition(fp, start, 'pcap_hdr_t')
 
 t0 = None
-frame_no = 1
 def tag_record_header(fp):
     global t0
-    global frame_no
 
     start = fp.tell()
     ts_sec = tagUint32(fp, 'ts_sec')
@@ -58,12 +56,13 @@ def tag_record_header(fp):
 
     length = tagUint32(fp, 'incl_len')
     tagUint32(fp, 'orig_len')
-    tagFromPosition(fp, start, 'pcaprec_hdr_s', f'No.{frame_no} t={delta}')
-    frame_no += 1
+    tagFromPosition(fp, start, 'pcaprec_hdr_s', f't={delta}')
     return length
 
+packet_no = 1
 def analyze(fp):
     global linktype
+    global packet_no
 
     setLittleEndian()
 
@@ -78,6 +77,8 @@ def analyze(fp):
     tag_global_header(fp)
 
     while not IsEof(fp):
+        mark = fp.tell()
+
         length = tag_record_header(fp)
 
         if linktype == networking.LINKTYPE.LINUX_SLL2.value:
@@ -86,6 +87,9 @@ def analyze(fp):
             networking.ethernet(fp, length, True)
         else:
             tag(fp, length, 'packet data', f'({length:d} bytes)')
+
+        tagFromPosition(fp, mark, f'Record (num:{packet_no})')
+        packet_no += 1
 
 if __name__ == '__main__':
     import sys

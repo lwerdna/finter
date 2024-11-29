@@ -12,6 +12,7 @@ FPATH=$HOME/repos/lwerdna/filesamples
 
 ./raw.py $FPATH/simple_http.pcap
 ./raw.py $FPATH/simple_http_sll2.pcap
+./raw.py $FPATH/simple_http_tzsp.pcapng
 ./raw.py $FPATH/200722_tcp_anon.pcapng
 ./raw.py $FPATH/teardrop.pcap
 

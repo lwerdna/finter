@@ -29,6 +29,9 @@ class Interval:
         self.type_ = type_
         self.comment = comment
 
+    def __len__(self):
+        return self.end - self.begin
+
 def intervals_from_text(lines):
     """ convert list of "[0 5] blah" lines to intervals """
 
@@ -68,6 +71,9 @@ class FinterNode():
         self.comment = comment
         self.children = []
         self.parent = None
+
+    def __len__(self):
+        return self.end - self.begin
 
     def __str__(self, depth=0):
         result = '  '*depth

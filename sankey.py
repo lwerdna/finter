@@ -2,20 +2,27 @@
 
 import os
 import sys
-from helpers import dissect_file, intervals_from_text, intervals_to_tree, Interval
+from helpers import dissect_file, intervals_to_tree, Interval
 
 index2descr = {}
 
 class sankeyNode():
-    def __init__(self, interval):
-        self.interval = interval
+    def __init__(self, begin, end, type_, comment):
+        self.begin = begin
+        self.end = end
+        self.type_ = type_
+        self.comment = comment
         self.children = []
         self.parent = None
 
+    def __len__(self):
+        return self.end - self.begin
+
     def assign_index(self, curr=0):
         self.index = curr
-        print('%s took index %d' % (str(self.interval), self.index))
-        index2descr[self.index] = self.interval.data
+        descr = f'[{self.begin}, {self.end}) {self.comment}'
+        print('%s took index %d' % (descr, self.index))
+        index2descr[self.index] = self.comment
 
         curr += 1
         if not self.children:
@@ -32,13 +39,13 @@ class sankeyNode():
 
         if self.children:
             # add our sdata
-            for c in sorted(self.children, key=lambda x: x.interval.begin):
+            for c in sorted(self.children, key=lambda x: x.begin):
                 source.append(self.index)
                 target.append(c.index)
-                value.append(c.interval.length())
+                value.append(len(c))
 
             # collect their sdata (depth first)
-            for c in sorted(self.children, key=lambda x: x.interval.begin):
+            for c in sorted(self.children, key=lambda x: x.begin):
                 [a,b,c] = c.sdata()
                 source += a
                 target += b
@@ -49,8 +56,8 @@ class sankeyNode():
 
 if __name__ == '__main__':
     fpath = sys.argv[1]
-    tree = dissect_file(fpath)
-    root = intervals_to_tree(tree, sankeyNode)
+    intervals = dissect_file(fpath)
+    root = intervals_to_tree(intervals, sankeyNode)
     root.assign_index()
 
     labels = [index2descr[x] for x in range(len(index2descr))]

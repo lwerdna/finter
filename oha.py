@@ -95,11 +95,11 @@ if __name__ == '__main__':
         sys.exit(0)
 
     #print(f'dissector: {dissector}')
-    interval_tree = dissect_file(fpath, offset, dissector)
-    if not interval_tree:
+    intervals = dissect_file(fpath, offset, dissector)
+    if not intervals:
         sys.exit(0)
 
-    root = intervals_to_tree(interval_tree, OHANode)
+    root = intervals_to_tree(intervals, OHANode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 

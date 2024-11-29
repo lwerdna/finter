@@ -1,29 +1,39 @@
 #!/usr/bin/env python
-#
 
-import re
-import io
+# simple dendrogram experiment
+# 
+# Every leaf node is a sample (row in the matrix).
+# Each leaf has a single dimension: the center of its interval (column in the matrix).
+#
+# What will the clustering algorithm produce?
+
 import sys
-from finter import elf32, elf64
-from helpers import dissect_file
+from helpers import dissect_file, intervals_to_tree
 
 import plotly.figure_factory as ff
 import numpy as np
 
+def leaves(node):
+    if not node.children:
+        return [node]
+
+    return sum([leaves(c) for c in node.children], [])
+
 if __name__ == '__main__':
 
-    tree = dissect_file(sys.argv[1])
+    intervals = dissect_file(sys.argv[1])
+    tree = intervals_to_tree(intervals)
+    leaves = leaves(tree)
 
-    leaves = [i for i in tree if len(tree.envelop(i))==1]
     print('%d leaves' % len(leaves))
     X = np.zeros((len(leaves),1))
 
     # <len(leaves)> rows, 1 columns
     names = []
     for i in range(len(leaves)):
-        names.append(leaves[i].data)
+        names.append(leaves[i].comment)
         for col in range(1):
-            X[i][col] = leaves[i].begin + leaves[i].length()/2.0
+            X[i][col] = leaves[i].begin + len(leaves[i])/2.0
 
     print(X)
     fig = ff.create_dendrogram(X, orientation='left', labels=names)
