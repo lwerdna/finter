@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 import sys
-from helpers import dissect_file, interval_tree_to_hierarchy
+from helpers import dissect_file, intervals_to_tree
 
 if __name__ == '__main__':
     tree = dissect_file(sys.argv[1])
-    root = interval_tree_to_hierarchy(tree)
+    root = intervals_to_tree(tree)
 
     dot = []
     dot.append('digraph G {')

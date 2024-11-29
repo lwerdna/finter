@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 #
-# display given file as offset, hex, ascii (OHA)
 
 import re
 import io
 import sys
 from finter import elf32, elf64
-from intervaltree import Interval, IntervalTree
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy
+from helpers import dissect_file
 
 import plotly.figure_factory as ff
 import numpy as np

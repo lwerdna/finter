@@ -4,7 +4,7 @@
 
 import re
 import sys
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode, handle_argv_common_utility
+from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, handle_argv_common_utility
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     if not interval_tree:
         sys.exit(0)
 
-    root = interval_tree_to_hierarchy(interval_tree, OHANode)
+    root = intervals_to_tree(interval_tree, OHANode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 

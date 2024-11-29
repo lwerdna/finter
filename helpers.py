@@ -7,7 +7,7 @@ import sys
 from subprocess import Popen, PIPE
 
 from finter import *
-from intervaltree import Interval, IntervalTree
+import algorithm
 
 def shellout(cmd):
     process = Popen(cmd, stdout=PIPE, stderr=PIPE)
@@ -20,14 +20,22 @@ def shellout(cmd):
     return (stdout, stderr)
 
 #------------------------------------------------------------------------------
-# intervaltree stuff
+# interval stuff
 #------------------------------------------------------------------------------
+
+class Interval:
+    def __init__(self, begin, end, type_, comment):
+        self.begin, self.end = begin, end
+        self.type_ = type_
+        self.comment = comment
 
 def intervals_from_text(lines):
     """ convert list of "[0 5] blah" lines to intervals """
 
+    lo_bound, hi_bound = None, None
+
     intervals = []
-    for (i,line) in enumerate(lines):
+    for i,line in enumerate(lines):
         #print('line %d: %s' % (i,line))
         if not line:
             continue
@@ -47,10 +55,7 @@ def intervals_from_text(lines):
         type_ = m.group(3)
         comment = m.group(4)
 
-        ibaggage = (type_, comment)
-
-        i = Interval(begin, end, ibaggage)
-        intervals.append(i)
+        intervals.append(Interval(begin, end, type_, comment))
 
     return intervals
 
@@ -65,8 +70,8 @@ class FinterNode():
         self.parent = None
 
     def __str__(self, depth=0):
-        result = '  '*depth+'FinterNode'
-        result += '[%d, %d)\n' % (self.begin, self.end)
+        result = '  '*depth
+        result += '[0x%x,0x%x) %s %s\n' % (self.begin, self.end, self.type_, self.comment)
         for c in sorted(self.children, key=lambda x: x.begin):
             result += c.__str__(depth+1)
         return result
@@ -100,38 +105,32 @@ def sort_and_create_fragments(node, NodeClass=FinterNode):
     for child in node.children:
         sort_and_create_fragments(child, NodeClass)
 
-def interval_tree_to_hierarchy(tree, NodeClass=FinterNode):
-    """ convert IntervalTree to a hierarchy """
+def intervals_to_tree_worker(anode, NodeClass):
+    if anode.root:
+        result = NodeClass(0, 0, '', 'root')
+    else:
+        interval = anode.item
+        result = NodeClass(interval.begin, interval.end, interval.type_, interval.comment)
+    
+    result.children = [intervals_to_tree_worker(c, NodeClass) for c in anode.children]
 
-    # initialize interval -> node mapping
-    child2parent = {i:None for i in tree}
+    return result
 
-    # consider every interval a possible parent
-    for parent in tree:
-        # whatever intervals they envelop are their possible children
-        children = tree.envelop(parent)
-        children = list(filter(lambda c: c.length() != parent.length(), children))
-        for c in children:
-            # children without a parent are adopted immediate
-            if not child2parent[c]:
-                child2parent[c] = parent
-            # else children select their smallest parents
-            else:
-                child2parent[c] = min(child2parent[c], parent, key=lambda x: x.length())
+def intervals_to_tree(intervals, NodeClass=FinterNode):
+    # define relation R: (x,y) \in R iff x envelopes y
+    def relation(x:Interval, y:Interval):
+        return x.begin <= y.begin and x.end >= y.end
 
-    # wrap the child2parent relationships
-    hnRoot = NodeClass(tree.begin(), tree.end(), 'none', 'root')
-    interval_to_node = { i:NodeClass(i.begin, i.end, i.data[0], i.data[1]) for i in tree }
+    atree = algorithm.build(intervals, relation, None)
 
-    for (child, parent) in child2parent.items():
-        hnChild = interval_to_node[child]
-        if not parent:
-            hnChild.parent = hnRoot
-            hnRoot.children.append(hnChild)
-        else:
-            hnParent = interval_to_node[parent]
-            hnChild.parent = hnParent
-            hnParent.children.append(hnChild)
+    # the whole-file interval should have been placed just below root
+    assert len(atree.children) == 1
+    atree = atree.children[0]
+
+    # convert the algorithm's output (anodes with .item holding Interval) to
+    # the requested NodeClass
+
+    hnRoot = intervals_to_tree_worker(atree, NodeClass)
 
     # create fragments
     sort_and_create_fragments(hnRoot, NodeClass)
@@ -258,9 +257,14 @@ def dissect_file(fpath, initial_offset=0, dissector_name=''):
     intervals = intervals_from_text(lines)
 
     # filter out null intervals
-    intervals = [i for i in intervals if i.length()]
+    intervals = [i for i in intervals if i.end > i.begin]
 
-    return IntervalTree(intervals)
+    # add interval for whole file if there isn't one already
+    fsize = os.path.getsize(fpath)
+    if not [i for i in intervals if i.end-i.begin == fsize]:
+        intervals.append(Interval(0, fsize, 'raw', 'file'))
+
+    return intervals
 
 def finter_type_to_struct_fmt(type_):
     # currently they're 1:1

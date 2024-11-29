@@ -7,7 +7,7 @@ import sys
 import struct
 import binascii
 
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode, finter_type_to_struct_fmt
+from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, finter_type_to_struct_fmt
 
 class MyNode(FinterNode):
     def __init__(self, begin, end, type_, comment):
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     interval_tree = dissect_file(fpath)
 
-    root = interval_tree_to_hierarchy(interval_tree, MyNode)
+    root = intervals_to_tree(interval_tree, MyNode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 

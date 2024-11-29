@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from helpers import dissect_file, interval_tree_to_hierarchy
+from helpers import dissect_file, intervals_to_tree
 
 def get_descr(hnode):
     result = hnode.data if hnode.data != 'root' else ''
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         shift_amount = int(sys.argv[2], 16)
 
     tree = dissect_file(sys.argv[1])
-    root = interval_tree_to_hierarchy(tree)
+    root = intervals_to_tree(tree)
 
     if shift_amount:
         def all_nodes(n):

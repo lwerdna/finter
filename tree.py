@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from helpers import dissect_file, interval_tree_to_hierarchy
+from helpers import dissect_file, intervals_to_tree
 
 def print_recur(hnode, depth=0):
     indent = depth*'  '
@@ -14,6 +14,6 @@ def print_recur(hnode, depth=0):
         print_recur(child, depth+1)
 
 if __name__ == '__main__':
-    tree = dissect_file(sys.argv[1])
-    root = interval_tree_to_hierarchy(tree)
+    intervals = dissect_file(sys.argv[1])
+    root = intervals_to_tree(intervals)
     print_recur(root)

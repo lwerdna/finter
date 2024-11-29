@@ -2,8 +2,7 @@
 
 import os
 import sys
-from intervaltree import Interval, IntervalTree
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy
+from helpers import dissect_file, intervals_from_text, intervals_to_tree, Interval
 
 index2descr = {}
 
@@ -51,7 +50,7 @@ class sankeyNode():
 if __name__ == '__main__':
     fpath = sys.argv[1]
     tree = dissect_file(fpath)
-    root = interval_tree_to_hierarchy(tree, sankeyNode)
+    root = intervals_to_tree(tree, sankeyNode)
     root.assign_index()
 
     labels = [index2descr[x] for x in range(len(index2descr))]

@@ -8,7 +8,7 @@ import json
 import struct
 import binascii
 
-from helpers import dissect_file, intervals_from_text, interval_tree_to_hierarchy, FinterNode, finter_type_to_struct_fmt
+from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, finter_type_to_struct_fmt
 
 # we'll augment the default node type with the ability to produce a python
 # data structure serializable to json
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     interval_tree = dissect_file(fpath)
 
-    root = interval_tree_to_hierarchy(interval_tree, JsonNode)
+    root = intervals_to_tree(interval_tree, JsonNode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 
