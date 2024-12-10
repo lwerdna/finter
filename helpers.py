@@ -127,7 +127,7 @@ def intervals_to_tree(intervals, NodeClass=FinterNode):
     def relation(x:Interval, y:Interval):
         return x.begin <= y.begin and x.end >= y.end
 
-    atree = algorithm.build(intervals, relation, None)
+    atree = algorithm.build(intervals, relation)
 
     # the whole-file interval should have been placed just below root
     assert len(atree.children) == 1
@@ -166,7 +166,8 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
         (r'^COMBO_BOOT', combo_boot.analyze),
         (r'u-boot legacy uImage', uboot.analyze),
         (r'pcapng capture file', pcapng.analyze),
-        (r'pcap capture file', pcap.analyze)
+        (r'pcap capture file', pcap.analyze),
+        (r'Certificate, Version=3', x509_der.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
@@ -203,6 +204,9 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
             analyze = mkv.analyze
         elif fpath.endswith('.pcapng'):
             analyze = pcapng.analyze
+        elif fpath.endswith('.der') or fpath.endswith('.cer'):
+            if sample[0:2] == b'\x30\x82':
+                analyze = x509_der.analyze
 
     if not analyze:
         if 'print' in failure_actions:
