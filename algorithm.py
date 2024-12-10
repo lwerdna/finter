@@ -11,15 +11,6 @@ class anode():
             self.children = []
         self.root = False
 
-    def apply_sort(self, sort_key=None):
-        for c in self.children:
-            c.apply_sort(sort_key)
-
-        if sort_key:
-            self.children = sorted(self.children, key=lambda n: sort_key(n.item))
-        else:
-            self.children = sorted(self.children, key=lambda n: n.item)
-
     def __str_depth__(self, depth):
         result = '  '*depth + str(self.item)
         if self.children:
@@ -79,14 +70,46 @@ def build_worker(tree, item, relation):
     tree.children.append(anode(item))
     return tree
 
-def build(items, relation, sort_func=None):
+def build(items, relation):
     root = anode("root")
     root.root = True
 
     for item in items:
         build_worker(root, item, relation)
 
-    if sort_func:
-        root.apply_sort(sort_func)
-
     return root
+
+if __name__ == '__main__':
+    # "is prefix of" relation
+    stuff = {'a', 'aardvark', 'ant', 'anteater', 'antelope'}
+    tree = build(stuff, lambda a,b: b.startswith(a))
+    print(tree)
+
+    # same
+    stuff = {'sve_int_brkp', 'sve_int_cmp_0', 'sve_int_cmp_1', 'sve_int_count',
+                'sve_int_count_r', 'sve_int_count_r_sat', 'sve_int_count_v',
+                'sve_int_count_v_sat', 'sve_int_countvlv0', 'sve_int_countvlv1',
+                'sve_int_cterm', 'sve_int_dup_fpimm', 'sve_int_dup_fpimm_pred',
+                'sve_int_dup_imm', 'sve_int_dup_imm_pred'}
+    tree = build(stuff, lambda a,b: b.startswith(a))
+    print(tree)
+
+    # same
+    stuff = {'./lib/.DS_Store', './lib/clang/11.0.0/include/rtmintrin.h',
+        './lib/clang/11.0.0/include/waitpkgintrin.h', './lib/clang/11.0.0/lib',
+        './lib/clang/11.0.0/lib/wasi', './lib/clang/11.0.0/lib/wasi/libclang_rt.builtins-wasm32.a',
+        './share', './share/clang', './share/clang/clang-format-bbedit.applescript',
+        './share/clang/clang-format-diff.py'}
+    tree = build(stuff, lambda a,b: b.startswith(a))
+    print(tree)
+
+    # "is superset of" relation
+    stuff = [{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, {3, 4, 5, 6, 7}, {6, 7}, {4, 5, 6},
+            {4, 5}, {5}, {8, 9, 10, 7}, {8}, {9, 10}, {1, 2}]
+    tree = build(stuff, lambda a,b: a.issuperset(b))
+    print(tree)
+
+    # "divides" relation
+    stuff = list(range(10))
+    tree = build(stuff, lambda a,b: b%a==0)
+    print(tree)
