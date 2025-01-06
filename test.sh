@@ -10,11 +10,14 @@ set -e
 
 FPATH=$HOME/repos/lwerdna/filesamples
 
-./raw.py $FPATH/simple_http.pcap
-./raw.py $FPATH/simple_http_sll2.pcap
-./raw.py $FPATH/simple_http_tzsp.pcapng
-./raw.py $FPATH/200722_tcp_anon.pcapng
-./raw.py $FPATH/teardrop.pcap
+./oha.py $FPATH/simple_http.pcap
+./oha.py $FPATH/simple_http_sll2.pcap
+./oha.py $FPATH/simple_http_tzsp.pcapng
+./oha.py $FPATH/200722_tcp_anon.pcapng
+./oha.py $FPATH/teardrop.pcap
+./oha.py $FPATH/x509_lets_encrypt.cer
+./oha.py $FPATH/hello-windows-x86.pe32.exe
+./oha.py $FPATH/hello-windows-x64.pe64.exe
 
 #FPATH=$HOME/fdumps/filesamples
 #
