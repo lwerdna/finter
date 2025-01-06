@@ -40,7 +40,7 @@ def analyze(fp):
     e_lfanew = tagUint32(fp, "e_lfanew")
     print("[0x%X,0x%X) raw image_dos_header" % \
         (oHdr, fp.tell()))
-    
+
     # image_nt_headers has signature and two substructures
     fp.seek(e_lfanew)
     tagUint32(fp, "signature")
@@ -48,7 +48,7 @@ def analyze(fp):
     oIFH = fp.tell()
     Machine = tagUint16(fp, "Machine")
     # pe.idFile() already checked the machine for us
-    
+
     NumberOfSections = tagUint16(fp, "NumberOfSections")
     tagUint32(fp, "TimeDateStamp")
     PointerToSymbolTable = tagUint32(fp, "PointerToSymbolTable")
@@ -106,7 +106,7 @@ def analyze(fp):
         (oIOH, fp.tell()))
     print("[0x%X,0x%X) raw image_nt_headers" % \
         (e_lfanew, fp.tell()))
-    
+
     (oScnReloc,nScnReloc)=(None,None)
     (oScnPdata,nScnPdata)=(None,None)
     fp.seek(oIOH + SizeOfOptionalHeader)

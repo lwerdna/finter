@@ -1,6 +1,19 @@
 #!/usr/bin/env python
 
-# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header
+# PE64 vs. PE32
+# 1) different id in image_nt_headers.image_file_header.Machine
+# 2) image_optional_header at 0xE0 (224 bytes) is replaced by
+#   image_optional_header64 at 0xF0 (240 bytes) with:
+#   2.1) BaseOfData is GONE, its bytes get absorbed into ImageBase, growing it
+#        from 4 bytes to 8 bytes
+#   2.2) all these fields grow from 4 to 8 bytes:
+#   - SizeOfStackReserve, SizeOfStackCommit, SizeOfHeapReserve, SizeOfHeapCommit
+#     all increase from 4 bytes to 8 bytes
+#
+# this should result in an image_optional_header that is 0xF0 bytes
+
+# References
+#   https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header#   https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header32
 
 import os
 import sys
@@ -24,17 +37,23 @@ class IMAGE_FILE_MACHINE(Enum):
     AMD64 = 0x8664
     ARM64 = 0xAA64
 
-# pe64 vs. pe32:
-# 1) different id in image_nt_headers.image_file_header.Machine
-# 2) image_optional_header at 0xE0 (224 bytes) is replaced by 
-#   image_optional_header64 at 0xF0 (240 bytes) with:
-#   2.1) BaseOfData is GONE, its bytes get absorbed into ImageBase, growing it
-#        from 4 bytes to 8 bytes
-#   2.2) all these fields grow from 4 to 8 bytes:
-#   - SizeOfStackReserve, SizeOfStackCommit, SizeOfHeapReserve, SizeOfHeapCommit
-#     all increase from 4 bytes to 8 bytes
-#
-# this should result in an Image_Optional_header that is 0xF0 bytes
+class IMAGE_DIRECTORY_ENTRY(Enum):
+    EXPORT = 0
+    IMPORT = 1
+    RESOURCE = 2
+    EXCEPTION = 3
+    SECURITY = 4
+    BASERELOC = 5
+    DEBUG = 6
+    ARCHITECTURE = 7
+    GLOBALPTR = 8
+    TLS = 9
+    LOAD_CONFIG = 10
+    BOUND_IMPORT = 11
+    IAT = 12
+    DELAY_IMPORT = 13
+    COM_DESCRIPTOR = 14
+    UNKNOWN = 15
 
 def idFile(fp):
     fpos = fp.tell()
@@ -45,14 +64,14 @@ def idFile(fp):
     #print "fileSize: 0x%X (%d)" % (fileSize, fileSize)
 
     # file large enough to hold IMAGE_DOS_HEADER ?
-    if fileSize < 0x40: 
+    if fileSize < 0x40:
         #print "file too small to hold IMAGE_DOS_HEADER"
         fp.seek(fpos)
         return False
 
     # is IMAGE_DOS_HEADER.e_magic == "MZ" ?
     fp.seek(0)
-    if fp.read(2) != b'MZ': 
+    if fp.read(2) != b'MZ':
         #print "missing MZ identifier"
         fp.seek(fpos)
         return False
@@ -62,14 +81,14 @@ def idFile(fp):
     e_lfanew = unpack('<I', fp.read(4))[0]
 
     # is file large enough to hold IMAGE_NT_HEADERS ?
-    if fileSize < (e_lfanew + 0x108): 
+    if fileSize < (e_lfanew + 0x108):
         #print "file too small to hold IMAGE_NT_HEADERS"
         fp.seek(fpos)
         return False
 
     # does IMAGE_NT_HEADERS.signature == "PE" ?
     fp.seek(e_lfanew)
-    if fp.read(4) != b'PE\x00\x00': 
+    if fp.read(4) != b'PE\x00\x00':
         #print "missing PE identifier"
         fp.seek(fpos)
         return False
@@ -84,21 +103,10 @@ def idFile(fp):
     fp.seek(fpos)
     return result
 
-def dataDirIdxToStr(idx):
-    lookup = [ "EXPORT", "IMPORT", "RESOURCE", "EXCEPTION", 
-        "SECURITY", "BASERELOC", "DEBUG", "ARCHITECTURE", 
-        "GLOBALPTR", "TLS", "LOAD_CONFIG", "BOUND_IMPORT", 
-        "IAT", "DELAY_IMPORT", "COM_DESCRIPTOR" ]
-
-    if idx>=0 and idx<len(lookup):
-        return lookup[idx]
-
-    return "UNKNOWN"
-
 def relocTypeToStr(t, machine=''):
     lookup = ["ABSOLUTE", "HIGH", "LOW", "HIGHLOW", "HIGHADJ"] # index [0,4]
     lookup.append({'':'UNKNOWN', 'mips':'MIPS_JMPADDR', # index 5
-        'arm':'ARM_MOV32', 'thumb':'ARM_MOV32', 
+        'arm':'ARM_MOV32', 'thumb':'ARM_MOV32',
         'risc-v':'RISCV_HIGH20'}[machine])
     lookup.append('RESERVED') # index 6
     lookup.append({'':'UNKNOWN', 'arm':'ARM_MOV32', # index 7
@@ -119,7 +127,7 @@ def tagReloc(fp, size, machine=''):
             print('[0x%X,0x%X) raw reloc block NULL' % (oBlockStart, oBlockStart+8))
             break;
 
-        VirtualAddress = tagUint32(fp, "VirtualAddress")    
+        VirtualAddress = tagUint32(fp, "VirtualAddress")
         SizeOfBlock = tagUint32(fp, "SizeOfBlock")
         nEntries = (SizeOfBlock-8)//2
         print('[0x%X,0x%X) raw reloc block 0x%X (%d entries)' % \

@@ -38,7 +38,7 @@ def analyze(fp):
     e_lfanew = tagUint32(fp, "e_lfanew")
     print("[0x%X,0x%X) raw image_dos_header" % \
         (oHdr, fp.tell()))
-    
+
     # image_nt_headers has signature and two substructures
     fp.seek(e_lfanew)
     tagUint32(fp, "signature")
@@ -46,7 +46,7 @@ def analyze(fp):
     oIFH = fp.tell()
     Machine = tagUint16(fp, "Machine", lambda x: '(%s)' % enum_int_to_name(pe.IMAGE_FILE_MACHINE, x))
     assert Machine == pe.IMAGE_FILE_MACHINE.I386.value
-    
+
     NumberOfSections = tagUint16(fp, "NumberOfSections")
     tagUint32(fp, "TimeDateStamp")
     PointerToSymbolTable = tagUint32(fp, "PointerToSymbolTable")
@@ -93,15 +93,15 @@ def analyze(fp):
         oDE = fp.tell()
         tagUint32(fp, "VirtualAddress")
         tagUint32(fp, "Size")
-        print("[0x%X,0x%X) DataDir %s" % \
-            (oDE, fp.tell(), pe.dataDirIdxToStr(i)))
+        print("[0x%X,0x%X) DataDir %d %s" % \
+            (oDE, fp.tell(), i, enum_int_to_name(pe.IMAGE_DIRECTORY_ENTRY, i)))
     print("[0x%X,0x%X) raw DataDirectory" % \
         (oDD, fp.tell()))
-    print("[0x%X,0x%X) raw image_optional_header" % \
+    print("[0x%X,0x%X) raw image_optional_header32" % \
         (oIOH, fp.tell()))
     print("[0x%X,0x%X) raw image_nt_headers" % \
         (e_lfanew, fp.tell()))
-    
+
     (oScnReloc, nScnReloc) = (None,None)
     fp.seek(oIOH + SizeOfOptionalHeader)
     for i in range(NumberOfSections):
@@ -120,11 +120,11 @@ def analyze(fp):
             (oISH, fp.tell(), Name.rstrip()))
         print("[0x%X,0x%X) section \"%s\" contents" % \
             (PointerToRawData, PointerToRawData+SizeOfRawData, Name.rstrip()))
-    
+
         if Name=='.reloc\x00\x00':
             oScnReloc = PointerToRawData
             nScnReloc = SizeOfRawData
-    
+
     if(oScnReloc):
         fp.seek(oScnReloc)
         pe.tagReloc(fp, nScnReloc)
