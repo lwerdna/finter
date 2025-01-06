@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header
+
 import os
 import sys
 
 from .helpers import *
 from struct import pack, unpack
+
+from enum import Enum, auto, unique
 
 IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16
 IMAGE_SIZEOF_SHORT_NAME = 8
@@ -14,10 +18,11 @@ IMAGE_SIZEOF_SECTION_HEADER = 40
 IMAGE_SIZEOF_SYMBOL = 18
 IMAGE_SIZEOF_ARCHIVE_MEMBER_HDR = 60
 
-IMAGE_FILE_MACHINE_I386 = 0x014c
-IMAGE_FILE_MACHINE_IA64 = 0x0200
-IMAGE_FILE_MACHINE_AMD64 = 0x8664
-IMAGE_FILE_MACHINE_ARM64 = 0xAA64
+class IMAGE_FILE_MACHINE(Enum):
+    I386 = 0x014c
+    IA64 = 0x0200
+    AMD64 = 0x8664
+    ARM64 = 0xAA64
 
 # pe64 vs. pe32:
 # 1) different id in image_nt_headers.image_file_header.Machine
@@ -72,9 +77,9 @@ def idFile(fp):
     #
     result = "unknown"
     (machine,) = unpack('<H', fp.read(2))
-    if machine in [IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_ARM64]:
+    if machine in [IMAGE_FILE_MACHINE.AMD64.value, IMAGE_FILE_MACHINE.ARM64.value]:
         result = "pe64"
-    if machine==IMAGE_FILE_MACHINE_I386:
+    if machine in [IMAGE_FILE_MACHINE.I386.value]:
         result = "pe32"
     fp.seek(fpos)
     return result
