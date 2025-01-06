@@ -152,3 +152,177 @@ def tagPdata(fp, size, machine=''):
             tagUint32(fp, 'EndAddress')
             tagUint32(fp, 'UnwindInfoAddress')
             current += 1
+
+def tag_image_dos_header(fp):
+    result = {}
+
+    oHdr = fp.tell()
+    e_magic = tag(fp, 2, "e_magic")
+    assert e_magic == b'MZ'
+    tagUint16(fp, "e_cblp")
+    tagUint16(fp, "e_cp")
+    tagUint16(fp, "e_crlc")
+    tagUint16(fp, "e_cparhdr")
+    tagUint16(fp, "e_minalloc")
+    tagUint16(fp, "e_maxalloc")
+    tagUint16(fp, "e_ss")
+    tagUint16(fp, "e_sp")
+    tagUint16(fp, "e_csum")
+    tagUint16(fp, "e_eip")
+    tagUint16(fp, "e_cs")
+    tagUint16(fp, "e_lfarlc")
+    tagUint16(fp, "e_ovno")
+    tag(fp, 8, "e_res");
+    tagUint16(fp, "e_oemid")
+    tagUint16(fp, "e_oeminfo")
+    tag(fp, 20, "e_res2");
+    result['e_lfanew'] = tagUint32(fp, "e_lfanew")
+    print("[0x%X,0x%X) raw image_dos_header" % \
+        (oHdr, fp.tell()))
+    return result
+
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header
+def tag_image_file_header(fp, bits):
+    assert bits in {32, 64}
+
+    result = {}
+
+    start = fp.tell()
+
+    result['Machine'] = tagUint16(fp, "Machine", lambda x: '(%s)' % enum_int_to_name(IMAGE_FILE_MACHINE, x))
+    result['NumberOfSections'] = tagUint16(fp, 'NumberOfSections')
+    result['TimeDateStamp'] = tagUint32(fp, 'TimeDateStamp')
+    result['PointerToSymbolTable'] = tagUint32(fp, 'PointerToSymbolTable')
+    result['NumberOfSymbols'] = tagUint32(fp, 'NumberOfSymbols')
+    result['SizeOfOptionalHeader'] = tagUint16(fp, 'SizeOfOptionalHeader')
+    result['Characteristics'] = tagUint16(fp, 'Characteristics')
+
+    tagFromPosition(fp, start, f'image_file_header{bits}')
+
+    return result
+
+def tag_data_directory(fp, bits):
+    result = []
+
+    start = fp.tell()
+
+    for i in range(IMAGE_NUMBEROF_DIRECTORY_ENTRIES):
+        mark = fp.tell()
+
+        VirtualAddress = tagUint32(fp, "VirtualAddress")
+        Size = tagUint32(fp, "Size")
+        tagFromPosition(fp, mark, 'DataDir %d %s' % \
+            (i, enum_int_to_name(IMAGE_DIRECTORY_ENTRY, i)))
+
+        result.append({'VirtualAddress':VirtualAddress, 'Size':Size})
+
+    tagFromPosition(fp, start, 'DataDirectory')
+
+    return result
+
+def tag_image_optional_header(fp, bits):
+    assert bits in {32, 64}
+
+    result = {}
+
+    start = fp.tell()
+
+    magic = tagUint16(fp, "Magic")
+    assert magic == 0x10B;
+    tagUint8(fp, "MajorLinkerVersion")
+    tagUint8(fp, "MinorLinkerVersion")
+    tagUint32(fp, "SizeOfCode")
+    tagUint32(fp, "SizeOfInitializedData")
+    tagUint32(fp, "SizeOfUninitializedData")
+    tagUint32(fp, "AddressOfEntryPoint")
+    tagUint32(fp, "BaseOfCode")
+
+    if bits == 32:
+        tagUint32(fp, "BaseOfData")
+    else:
+        # removed in 64-bit
+        pass
+
+    tagUint32(fp, "ImageBase")
+    tagUint32(fp, "SectionAlignment")
+    tagUint32(fp, "FileAlignment")
+    tagUint16(fp, "MajorOperatingSystemVersion")
+    tagUint16(fp, "MinorOperatingSystemVersion")
+    tagUint16(fp, "MajorImageVersion")
+    tagUint16(fp, "MinorImageVersion")
+    tagUint16(fp, "MajorSubsystemVersion")
+    tagUint16(fp, "MinorSubsystemVersion")
+    tagUint32(fp, "Win32VersionValue")
+    tagUint32(fp, "SizeOfImage")
+    tagUint32(fp, "SizeOfHeaders")
+    tagUint32(fp, "CheckSum")
+    tagUint16(fp, "Subsystem")
+    tagUint16(fp, "DllCharacteristics")
+
+    if bits == 32:
+        tagUint32(fp, "SizeOfStackReserve")
+        tagUint32(fp, "SizeOfStackCommit")
+        tagUint32(fp, "SizeOfHeapReserve")
+        tagUint32(fp, "SizeOfHeapCommit")
+    else:
+        tagUint64(fp, "SizeOfStackReserve")
+        tagUint64(fp, "SizeOfStackCommit")
+        tagUint64(fp, "SizeOfHeapReserve")
+        tagUint64(fp, "SizeOfHeapCommit")
+
+    tagUint32(fp, "LoaderFlags")
+    tagUint32(fp, "NumberOfRvaAndSizes")
+
+    tag_data_directory(fp, bits)
+
+    tagFromPosition(fp, start, f'image_optional_header{bits}')
+
+    return result
+
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_nt_headers32
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_nt_headers64
+#
+# image_nt_headers
+#   signature (4)
+#   image_file_header (struct)
+#     ...
+#   image_optional_header (struct)
+#     ...
+def tag_image_nt_headers(fp, bits):
+    assert bits in {32, 64}
+
+    result = {}
+
+    start = fp.tell()
+
+    tagUint32(fp, "signature")
+
+    result['image_file_header_offs'] = fp.tell()
+    result['image_file_header'] = tag_image_file_header(fp, bits)
+
+    result['image_optional_header_offs'] = fp.tell()
+    result['image_optional_header'] = tag_image_optional_header(fp, bits)
+
+    tagFromPosition(fp, start, f'image_nt_headers{bits}')
+
+    return result
+
+def tag_section(fp, bits):
+    result = {}
+
+    start = fp.tell()
+
+    result['Name'] = tagString(fp, IMAGE_SIZEOF_SHORT_NAME, "Name").rstrip()
+    tagUint32(fp, "VirtualSize");
+    tagUint32(fp, "VirtualAddress");
+    result['SizeOfRawData'] = tagUint32(fp, "SizeOfRawData")
+    result['PointerToRawData'] = tagUint32(fp, "PointerToRawData")
+    tagUint32(fp, "PointerToRelocations")
+    tagUint32(fp, "PointerToLineNumbers")
+    tagUint16(fp, "NumberOfRelocations")
+    tagUint16(fp, "NumberOfLineNumbers")
+    tagUint32(fp, "Characteristics")
+
+    tagFromPosition(fp, start, 'image_section_header \"%s\"' % result['Name'])
+
+    return result
