@@ -29,16 +29,26 @@ def analyze(fp):
     o_sections = image_nt_headers['image_optional_header_offs'] + image_file_header['SizeOfOptionalHeader']
     fp.seek(o_sections)
 
-    for i in range(image_file_header['NumberOfSections']):
-        section = pe.tag_section(fp, 32)
+    scnhdrs = pe.tag_section_headers(fp, image_file_header['NumberOfSections'])
 
-        name, o, n = section['Name'], section['PointerToRawData'], section['SizeOfRawData']
+    for hdr in scnhdrs:
+        name, o, n = hdr['Name'], hdr['PointerToRawData'], hdr['SizeOfRawData']
 
         if name == '.reloc':
             fp.seek(o)
             pe.tagReloc(fp, n)
         else:
             print("[0x%X,0x%X) section \"%s\" contents" % (o, o+n, name))
+
+    # If data directory entry 14 (COM_DESCRIPTOR) looks like it points to a ClrHeader/IMAGE_COR20_HEADER
+    # this is a .NET executable.
+    dde = image_nt_headers['image_optional_header']['data_directory'][14]
+    rva = dde['VirtualAddress']
+    if rva and dde['Size'] == 72:
+        # resolve virtual address to offset
+        if offs := pe.rva_to_file_offset(rva, scnhdrs):
+            fp.seek(offs)
+            pe.tag_image_cor20_header(fp)
 
 if __name__ == '__main__':
     import sys

@@ -28,13 +28,14 @@ def analyze(fp):
 
     (oScnReloc, nScnReloc) = (None,None)
 
+
     o_sections = image_nt_headers['image_optional_header_offs'] + image_file_header['SizeOfOptionalHeader']
     fp.seek(o_sections)
 
-    for i in range(image_file_header['NumberOfSections']):
-        section = pe.tag_section(fp, 64)
+    scnhdrs = pe.tag_section_headers(fp, image_file_header['NumberOfSections'])
 
-        name, o, n = section['Name'], section['PointerToRawData'], section['SizeOfRawData']
+    for hdr in scnhdrs:
+        name, o, n = hdr['Name'], hdr['PointerToRawData'], hdr['SizeOfRawData']
 
         if name == '.reloc':
             fp.seek(o)

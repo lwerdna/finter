@@ -21,6 +21,7 @@ from struct import pack, unpack
 from enum import Enum, auto, unique
 
 IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16
+IMAGE_SIZEOF_IMAGE_DATA_DIRECTORY = 8
 IMAGE_SIZEOF_SHORT_NAME = 8
 IMAGE_SIZEOF_SECTION_HEADER = 40
 IMAGE_SIZEOF_FILE_HEADER = 20
@@ -55,6 +56,14 @@ class IMAGE_DIRECTORY_ENTRY(Enum):
     DELAY_IMPORT = 13
     COM_DESCRIPTOR = 14
     UNKNOWN = 15
+
+class COMIMAGE_FLAGS(Enum):
+    ILONLY = 1
+    _32BITREQUIRED = 2
+    IL_LIBRARY = 4
+    STRONGNAMESIGNED = 8
+    NATIVE_ENTRYPOINT = 16
+    TRACKDEBUGDATA = 0x10000
 
 def idFile(fp):
     fpos = fp.tell()
@@ -202,39 +211,26 @@ def tag_image_file_header(fp, bits):
 
     return result
 
-def tag_data_directory(fp, bits):
-    result = []
-
-    start = fp.tell()
-
-    for i in range(IMAGE_NUMBEROF_DIRECTORY_ENTRIES):
-        mark = fp.tell()
-
-        VirtualAddress = tagUint32(fp, "VirtualAddress")
-        Size = tagUint32(fp, "Size")
-        tagFromPosition(fp, mark, 'DataDir %d %s' % \
-            (i, enum_int_to_name(IMAGE_DIRECTORY_ENTRY, i)))
-
-        result.append({'VirtualAddress':VirtualAddress, 'Size':Size})
-
-    tagFromPosition(fp, start, 'DataDirectory')
-
-    return result
+def tag_image_data_directory(fp, comment):
+    tag(fp, IMAGE_SIZEOF_IMAGE_DATA_DIRECTORY, 'IMAGE_DATA_DIRECTORY', comment, True)
+    a = tagUint32(fp, "VirtualAddress")
+    b = tagUint32(fp, "Size")
+    return {'VirtualAddress':a, 'Size':b}
 
 # https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64
 def tag_image_optional_header(fp, bits):
     assert bits in {32, 64}
 
-    result = {}
+    result = {'data_directory':[]}
 
     start = fp.tell()
 
-    magic = tagUint16(fp, "Magic")
+    result['Magic'] = tagUint16(fp, "Magic")
 
     if bits == 32:
-        assert magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC
+        assert result['Magic'] == IMAGE_NT_OPTIONAL_HDR32_MAGIC
     elif bits == 64:
-        assert magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC
+        assert result['Magic'] == IMAGE_NT_OPTIONAL_HDR64_MAGIC
 
     tagUint8(fp, "MajorLinkerVersion")
     tagUint8(fp, "MinorLinkerVersion")
@@ -280,7 +276,13 @@ def tag_image_optional_header(fp, bits):
     tagUint32(fp, "LoaderFlags")
     tagUint32(fp, "NumberOfRvaAndSizes")
 
-    tag_data_directory(fp, bits)
+    # IMAGE_DATA_DIRECTORY entries
+    size = IMAGE_NUMBEROF_DIRECTORY_ENTRIES * IMAGE_SIZEOF_IMAGE_DATA_DIRECTORY
+    tag(fp, size, 'DataDirectory', '', True)
+    for i in range(IMAGE_NUMBEROF_DIRECTORY_ENTRIES):
+        comment = 'entry[%d] %s' % (i, enum_int_to_name(IMAGE_DIRECTORY_ENTRY, i))
+        idd = tag_image_data_directory(fp, comment)
+        result['data_directory'].append(idd)
 
     tagFromPosition(fp, start, f'image_optional_header{bits}')
 
@@ -295,6 +297,7 @@ def tag_image_optional_header(fp, bits):
 #     ...
 #   image_optional_header (struct)
 #     ...
+#     data directory
 def tag_image_nt_headers(fp, bits):
     assert bits in {32, 64}
 
@@ -314,14 +317,14 @@ def tag_image_nt_headers(fp, bits):
 
     return result
 
-def tag_section(fp, bits):
+def tag_section_header(fp):
     result = {}
 
     start = fp.tell()
 
     result['Name'] = tagString(fp, IMAGE_SIZEOF_SHORT_NAME, "Name").rstrip()
-    tagUint32(fp, "VirtualSize");
-    tagUint32(fp, "VirtualAddress");
+    result['VirtualSize'] = tagUint32(fp, "VirtualSize")
+    result['VirtualAddress'] = tagUint32(fp, "VirtualAddress")
     result['SizeOfRawData'] = tagUint32(fp, "SizeOfRawData")
     result['PointerToRawData'] = tagUint32(fp, "PointerToRawData")
     tagUint32(fp, "PointerToRelocations")
@@ -333,3 +336,55 @@ def tag_section(fp, bits):
     tagFromPosition(fp, start, 'image_section_header \"%s\"' % result['Name'])
 
     return result
+
+def tag_section_headers(fp, n):
+    result = []
+    for i in range(n):
+        section = tag_section_header(fp)
+        result.append(section)
+    return result
+
+# resolve an RVA to an offset within the file
+def rva_to_file_offset(rva, scnhdrs):
+    for hdr in scnhdrs:
+        if hdr['VirtualAddress'] <= rva < (hdr['VirtualAddress'] + hdr['VirtualSize']):
+            # get offset within this section
+            delta = rva - hdr['VirtualAddress']
+
+            # is that raw data available in the section contents?
+            if delta < hdr['SizeOfRawData']:
+                return hdr['PointerToRawData'] + delta
+
+# MS tools: dumpbin, ildasm, corflags
+# https://jstdev.wordpress.com/2014/02/16/clr-header/
+# https://github.com/kimperator/NinjectLib/blob/master/IATModifier.cpp
+# https://pan-unit42.github.io/dotnetfile/api_documentation/header/cor20/
+# https://github.com/pan-unit42/dotnetfile
+def tag_image_cor20_header(fp):
+    start = fp.tell()
+
+    tagUint32(fp, 'cb (size)')
+
+    # usually 2, 5
+    # can be set to 2, 0 with RevertCLRHeader flag to corflags tool
+    tagUint16(fp, 'MajorRuntimeVersion') # usually 2
+    tagUint16(fp, 'MinorRuntimeVersion') # usually 5
+    tag_image_data_directory(fp, 'MetaData')
+    Flags = tagUint32(fp, 'Flags', lambda x: flags_string(COMIMAGE_FLAGS, x))
+
+    # "pure IL executables trigger more restrictive PE header checks"
+
+    if Flags & COMIMAGE_FLAGS.NATIVE_ENTRYPOINT.value:
+        # native entrypoint
+        tagUint32(fp, 'EntryPointRVA')
+    else:
+        # managed entrypoint
+        tagUint32(fp, 'EntryPointToken')
+
+    tag_image_data_directory(fp, 'Resources')
+    tag_image_data_directory(fp, 'CodeManagerTable')
+    tag_image_data_directory(fp, 'VTableFixups')
+    tag_image_data_directory(fp, 'ExportAddressTableJumps')
+    tag_image_data_directory(fp, 'ManagedNativeHeader')
+
+    tagFromPosition(fp, start, 'image_cor20_header')

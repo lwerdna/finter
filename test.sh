@@ -18,6 +18,9 @@ FPATH=$HOME/repos/lwerdna/filesamples
 ./oha.py $FPATH/x509_lets_encrypt.cer
 ./oha.py $FPATH/hello-windows-x86.pe32.exe
 ./oha.py $FPATH/hello-windows-x64.pe64.exe
+./oha.py $FPATH/hello-mono.exe
+./oha.py $FPATH/hello-mono-square.exe
+./oha.py $FPATH/square-mono.dll
 
 #FPATH=$HOME/fdumps/filesamples
 #
