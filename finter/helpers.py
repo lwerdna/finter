@@ -254,12 +254,16 @@ def string(FP, length, peek=0):
     if peek: FP.seek(-1*length, 1)
     return binary.decode('utf-8')
 
+# null-terminated string
 def string_null(FP, peek=0):
 	buf = b''
 	while not buf.endswith(b'\x00'):
 		buf += FP.read(1)
 	if peek: FP.seek(-1*len(buf), 1)
 	return buf[0:-1].decode('utf-8')
+
+
+
 #
 def dataUntil(FP, terminator, peek=0):
     data = b''
@@ -369,6 +373,16 @@ def tagUleb128(FP, name, comment='', peek=0):
 def tagString(FP, length, name, peek=0):
     pos = FP.tell()
     val = string(FP, length, peek)
+    if name:
+        print('[0x%X,0x%X) string %s=\"%s\"' % (pos, pos+length, name, val))
+    else:
+        print('[0x%X,0x%X) string \"%s\"' % (pos, pos+length, val))
+    return val
+
+def tagStringNull(FP, name, peek=0):
+    pos = FP.tell()
+    val = string_null(FP, peek)
+    length = len(val) + 1
     if name:
         print('[0x%X,0x%X) string %s=\"%s\"' % (pos, pos+length, name, val))
     else:

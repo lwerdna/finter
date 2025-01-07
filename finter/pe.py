@@ -363,28 +363,52 @@ def rva_to_file_offset(rva, scnhdrs):
 def tag_image_cor20_header(fp):
     start = fp.tell()
 
+    result = {}
+
     tagUint32(fp, 'cb (size)')
 
     # usually 2, 5
     # can be set to 2, 0 with RevertCLRHeader flag to corflags tool
-    tagUint16(fp, 'MajorRuntimeVersion') # usually 2
-    tagUint16(fp, 'MinorRuntimeVersion') # usually 5
-    tag_image_data_directory(fp, 'MetaData')
-    Flags = tagUint32(fp, 'Flags', lambda x: flags_string(COMIMAGE_FLAGS, x))
+    result['MajorRuntimeVersion'] = tagUint16(fp, 'MajorRuntimeVersion') # usually 2
+    result['MinorRuntimeVersion'] = tagUint16(fp, 'MinorRuntimeVersion') # usually 5
+    result['MetaData'] = tag_image_data_directory(fp, 'MetaData')
+    result['Flags'] = tagUint32(fp, 'Flags', lambda x: flags_string(COMIMAGE_FLAGS, x))
 
     # "pure IL executables trigger more restrictive PE header checks"
 
-    if Flags & COMIMAGE_FLAGS.NATIVE_ENTRYPOINT.value:
+    if result['Flags'] & COMIMAGE_FLAGS.NATIVE_ENTRYPOINT.value:
         # native entrypoint
-        tagUint32(fp, 'EntryPointRVA')
+        result['EntryPointRVA'] = tagUint32(fp, 'EntryPointRVA')
     else:
         # managed entrypoint
-        tagUint32(fp, 'EntryPointToken')
+        result['EntryPointToken'] = tagUint32(fp, 'EntryPointToken')
 
-    tag_image_data_directory(fp, 'Resources')
-    tag_image_data_directory(fp, 'CodeManagerTable')
-    tag_image_data_directory(fp, 'VTableFixups')
-    tag_image_data_directory(fp, 'ExportAddressTableJumps')
-    tag_image_data_directory(fp, 'ManagedNativeHeader')
+    result['Resources'] = tag_image_data_directory(fp, 'Resources')
+    result['CodeManagerTable'] = tag_image_data_directory(fp, 'CodeManagerTable')
+    result['VTableFixups'] = tag_image_data_directory(fp, 'VTableFixups')
+    result['ExportAddressTableJumps'] = tag_image_data_directory(fp, 'ExportAddressTableJumps')
+    result['ManagedNativeHeader'] = tag_image_data_directory(fp, 'ManagedNativeHeader')
 
     tagFromPosition(fp, start, 'image_cor20_header')
+
+    return result
+
+# https://www.red-gate.com/simple-talk/blogs/anatomy-of-a-net-assembly-clr-metadata-3/
+def tag_MetadataHeader(fp):
+    result = {}
+
+    start = fp.tell()
+
+    result['Signature'] = tag(fp, 4, 'Signature', '')
+    assert result['Signature'] == b'BSJB'
+    result['MajorVersion'] = tagUint16(fp, 'MajorVersion')
+    result['MinorVersion'] = tagUint16(fp, 'MinorVersion')
+    result['Reserved1'] = tagUint32(fp, 'Reserved1')
+    result['VersionStringLength'] = tagUint32(fp, 'VersionStringLength')
+    result['VersionString'] = tagString(fp, result['VersionStringLength'], 'VersionString')
+    result['Flags'] = tagUint16(fp, 'Flags')
+    result['NumberOfStreams'] = tagUint16(fp, 'NumberOfStreams')
+
+    tagFromPosition(fp, start, 'MetadataHeader')
+
+    return result

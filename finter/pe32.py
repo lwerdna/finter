@@ -48,7 +48,14 @@ def analyze(fp):
         # resolve virtual address to offset
         if offs := pe.rva_to_file_offset(rva, scnhdrs):
             fp.seek(offs)
-            pe.tag_image_cor20_header(fp)
+            c2hdr = pe.tag_image_cor20_header(fp)
+
+            dde = c2hdr['MetaData']
+            rva = dde['VirtualAddress']
+            if rva:
+                if offs := pe.rva_to_file_offset(rva, scnhdrs):
+                    fp.seek(offs)
+                    pe.tag_MetadataHeader(fp)
 
 if __name__ == '__main__':
     import sys
