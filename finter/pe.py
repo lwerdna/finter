@@ -12,9 +12,6 @@
 #
 # this should result in an image_optional_header that is 0xF0 bytes
 
-# References
-#   https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header#   https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header32
-
 import os
 import sys
 
@@ -30,6 +27,10 @@ IMAGE_SIZEOF_FILE_HEADER = 20
 IMAGE_SIZEOF_SECTION_HEADER = 40
 IMAGE_SIZEOF_SYMBOL = 18
 IMAGE_SIZEOF_ARCHIVE_MEMBER_HDR = 60
+
+IMAGE_NT_OPTIONAL_HDR32_MAGIC = 0x10b
+IMAGE_NT_OPTIONAL_HDR64_MAGIC = 0x20b
+IMAGE_ROM_OPTIONAL_HDR_MAGIC = 0x107
 
 class IMAGE_FILE_MACHINE(Enum):
     I386 = 0x014c
@@ -220,6 +221,7 @@ def tag_data_directory(fp, bits):
 
     return result
 
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64
 def tag_image_optional_header(fp, bits):
     assert bits in {32, 64}
 
@@ -228,7 +230,12 @@ def tag_image_optional_header(fp, bits):
     start = fp.tell()
 
     magic = tagUint16(fp, "Magic")
-    assert magic == 0x10B;
+
+    if bits == 32:
+        assert magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC
+    elif bits == 64:
+        assert magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC
+
     tagUint8(fp, "MajorLinkerVersion")
     tagUint8(fp, "MinorLinkerVersion")
     tagUint32(fp, "SizeOfCode")
