@@ -167,7 +167,8 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
         (r'u-boot legacy uImage', uboot.analyze),
         (r'pcapng capture file', pcapng.analyze),
         (r'pcap capture file', pcap.analyze),
-        (r'Certificate, Version=3', x509_der.analyze)
+        (r'Certificate, Version=3', x509_der.analyze),
+        (r'ar archive', ar.analyze)
     ]
 
     (file_str, _) = shellout(['file', fpath])
