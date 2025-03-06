@@ -22,6 +22,8 @@ FPATH=$HOME/repos/lwerdna/filesamples
 ./oha.py $FPATH/hello-mono-square.exe
 ./oha.py $FPATH/square-mono.dll
 ./oha.py h264_annexb $FPATH/lena_annex.h264
+./oha.py avcc $FPATH/avcc-data.bin
+./oha.py avcc_extradata $FPATH/avcc-extradata.bin
 
 #FPATH=$HOME/fdumps/filesamples
 #
