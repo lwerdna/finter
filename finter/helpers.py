@@ -397,6 +397,22 @@ def tagDataUntil(FP, term, name, comment, peek=0):
         print('[0x%X,0x%X) raw \"%s\" %s' % (pos, pos+len(data), data, comment))
     return data
 
+def tagFormat(fp, fmt, *names):
+    assert len(fmt) == len(names)
+
+    result = {}
+
+    for i in range(len(fmt)):
+        fchar = fmt[i]
+        name = names[i]
+
+        if fchar == 'I':
+            result[name] = tagUint32(fp, name)
+        else:
+            assert False
+
+    return result
+
 ###############################################################################
 # misc
 ###############################################################################
