@@ -142,7 +142,7 @@ def ethernet_802_3(fp, length=None, descend=False):
     tagFromPosition(fp, mark, 'ethernet 802.3 header')
 
     # > Since the recipient still needs to know how to interpret the frame, the
-    # > standard required an IEEE 802.2 header to follow the length and specify
+    # > standard requires an IEEE 802.2 header to follow the length and specify
     # > the type. TODO
 
     # https://en.wikipedia.org/wiki/IEEE_802.2
@@ -171,7 +171,7 @@ def ethernet(fp, length=None, descend=False):
     # see "Ethernet Frame Differentiation" at https://en.wikipedia.org/wiki/Ethernet_frame
 
     # ethernet ii
-    if tmp > 0x0600:
+    if tmp >= 0x0600:
         ethernet_ii(fp, length, descend=descend)
     # 802.3
     else:
