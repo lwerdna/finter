@@ -188,10 +188,12 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
 
         if sample.startswith(b'COMBO_BOOT\x00\x00'):
             analyze = combo_boot.analyze
-        if sample.startswith(b'AVB0'):
+        elif sample.startswith(b'AVB0'):
             analyze = avb.analyze
-        if sample[4:8] == b'\x01\x00\x41\x54':
+        elif sample[4:8] == b'\x01\x00\x41\x54':
             analyze = atags.analyze
+        elif sample.startswith(b'\xd0\x0d\xfe\xed'):
+            analyze = fdt.analyze
 
     # TECHNIQUE 3: guess based on file extension
     #

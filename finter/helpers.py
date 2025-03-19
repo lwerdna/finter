@@ -80,38 +80,38 @@ def colorFromBytes(data):
     assert avg >= 0 and avg <= 255
     return color_lookup[avg]
 
-def colorFromBytesFP(FP, length, rewind=0):
-    tmp = FP.tell()
-    result = colorFromBytes(FP.read(length));
-    if rewind: FP.seek(tmp)
+def colorFromBytesfp(fp, length, peek=0):
+    tmp = fp.tell()
+    result = colorFromBytes(fp.read(length));
+    if peek: fp.seek(tmp)
     return result
 
 ###############################################################################
-# FP conveniences
+# fp conveniences
 ###############################################################################
 
-def IsEof(FP):
+def IsEof(fp):
     answer = False
-    temp = FP.tell()
-    if FP.read() == b'':
+    temp = fp.tell()
+    if fp.read() == b'':
         answer = True
-    FP.seek(temp)
+    fp.seek(temp)
     return answer
 
-def remaining(FP):
-    a = FP.tell()
-    FP.seek(0, io.SEEK_END);
-    b = FP.tell()
-    FP.seek(a, io.SEEK_SET);
+def remaining(fp):
+    a = fp.tell()
+    fp.seek(0, io.SEEK_END);
+    b = fp.tell()
+    fp.seek(a, io.SEEK_SET);
     return b-a
 
-def peek(FP, amt):
-    value = FP.read(amt)
-    FP.seek(-amt, io.SEEK_CUR)
+def peek(fp, amt):
+    value = fp.read(amt)
+    fp.seek(-amt, io.SEEK_CUR)
     return value
 
-def rewind(FP, amt):
-	FP.seek(-amt, io.SEEK_CUR)
+def rewind(fp, amt):
+	fp.seek(-amt, io.SEEK_CUR)
 
 ###############################################################################
 # endianness
@@ -177,66 +177,66 @@ def setEndian(what):
 # data accessors
 ###############################################################################
 
-def int8(FP, peek=0):
+def int8(fp, peek=0):
     global fmt8
-    value = unpack(fmt8, FP.read(1))[0]
-    if peek: FP.seek(-1,1)
+    value = unpack(fmt8, fp.read(1))[0]
+    if peek: fp.seek(-1,1)
     return value
 
-def uint8(FP, peek=0):
+def uint8(fp, peek=0):
     global fmtu8
-    value = unpack(fmtu8, FP.read(1))[0]
-    if peek: FP.seek(-1,1)
+    value = unpack(fmtu8, fp.read(1))[0]
+    if peek: fp.seek(-1,1)
     return value
 
-def int16(FP, peek=0):
+def int16(fp, peek=0):
     global fmt16
-    value = unpack(fmt16, FP.read(2))[0]
-    if peek: FP.seek(-2,1)
+    value = unpack(fmt16, fp.read(2))[0]
+    if peek: fp.seek(-2,1)
     return value
 
-def uint16(FP, peek=0):
+def uint16(fp, peek=0):
     global fmtu16
-    value = unpack(fmtu16, FP.read(2))[0]
-    if peek: FP.seek(-2,1)
+    value = unpack(fmtu16, fp.read(2))[0]
+    if peek: fp.seek(-2,1)
     return value
 
-def int32(FP, peek=0):
+def int32(fp, peek=0):
     global fmt32
-    value = unpack(fmt32, FP.read(4))[0]
-    if peek: FP.seek(-4,1)
+    value = unpack(fmt32, fp.read(4))[0]
+    if peek: fp.seek(-4,1)
     return value
 
-def uint32(FP, peek=0):
+def uint32(fp, peek=0):
     global fmtu32
-    value = unpack(fmtu32, FP.read(4))[0]
-    if peek: FP.seek(-4,1)
+    value = unpack(fmtu32, fp.read(4))[0]
+    if peek: fp.seek(-4,1)
     return value
 
-def int64(FP, peek=0):
+def int64(fp, peek=0):
     global fmt64
-    value = unpack(fmt64, FP.read(8))[0]
-    if peek: FP.seek(-8,1)
+    value = unpack(fmt64, fp.read(8))[0]
+    if peek: fp.seek(-8,1)
     return value
 
-def uint64(FP, peek=0):
+def uint64(fp, peek=0):
     global fmtu64
-    value = unpack(fmtu64, FP.read(8))[0]
-    if peek: FP.seek(-8,1)
+    value = unpack(fmtu64, fp.read(8))[0]
+    if peek: fp.seek(-8,1)
     return value
 
-def uleb128(FP, peek=0):
-    anchor = FP.tell()
+def uleb128(fp, peek=0):
+    anchor = fp.tell()
 
     nbytes = 0
     value = 0
     while 1:
         if nbytes > 6:
-            FP.seek(anchor)
-            sample = binascii.hexlify(FP.read(5))
+            fp.seek(anchor)
+            sample = binascii.hexlify(fp.read(5))
             raise Exception("invalid uleb128 at offs=0x%X %s..." % (anchor, sample))
 
-        t = unpack('B', FP.read(1))[0]
+        t = unpack('B', fp.read(1))[0]
         value = value | ((t & 0x7F)<<(7*nbytes))
         nbytes += 1
 
@@ -244,63 +244,63 @@ def uleb128(FP, peek=0):
             break
 
     if peek:
-        FP.seek(anchor)
+        fp.seek(anchor)
 
     return (value, nbytes)
 
 # strings (eats trailing nulls)
-def string(FP, length, peek=0):
-    binary = FP.read(length).rstrip(b'\x00')
-    if peek: FP.seek(-1*length, 1)
+def string(fp, length, peek=0):
+    binary = fp.read(length).rstrip(b'\x00')
+    if peek: fp.seek(-1*length, 1)
     return binary.decode('utf-8')
 
 # null-terminated string
-def string_null(FP, peek=0):
+def string_null(fp, peek=0):
 	buf = b''
 	while not buf.endswith(b'\x00'):
-		buf += FP.read(1)
-	if peek: FP.seek(-1*len(buf), 1)
+		buf += fp.read(1)
+	if peek: fp.seek(-1*len(buf), 1)
 	return buf[0:-1].decode('utf-8')
 
 #
-def dataUntil(FP, terminator, peek=0):
+def dataUntil(fp, terminator, peek=0):
     data = b''
     lenterm = len(terminator)
     while 1:
-        data += FP.read(1)
+        data += fp.read(1)
 
         if len(data) >= lenterm:
             if data[-lenterm:] == terminator:
                 break
-    if peek: FP.seek(-len(data), 1)
+    if peek: fp.seek(-len(data), 1)
     return data
 
 ###############################################################################
 # taggers
 ###############################################################################
 
-def tag(FP, length, name, comment='', rewind=0):
-    pos = FP.tell()
-    val = FP.read(length)
+def tag(fp, length, name, comment='', peek=0):
+    pos = fp.tell()
+    val = fp.read(length)
     if type(comment) == types.FunctionType: comment = comment(val)
     print('[0x%X,0x%X) raw %s %s' % (pos, pos+length, name, comment))
-    if rewind: FP.seek(pos)
+    if peek: fp.seek(pos)
     return val
 
 # tag from an earlier file position to the current file position
-def tagFromPosition(FP, position, name, comment=''):
-    length = FP.tell() - position
-    FP.seek(position)
-    return tag(FP, length, name, comment)
+def tagFromPosition(fp, position, name, comment=''):
+    length = fp.tell() - position
+    fp.seek(position)
+    return tag(fp, length, name, comment)
 
 # tag from the current file position to a later file position
-def tagToPosition(FP, position, name, comment=''):
+def tagToPosition(fp, position, name, comment=''):
     length = position - fp.tell()
-    return tag(FP, length, name, comment)
+    return tag(fp, length, name, comment)
 
-def tagUint8(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    val = uint8(FP, peek)
+def tagUint8(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = uint8(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+1, fmtu8, name, val, comment))
@@ -308,9 +308,9 @@ def tagUint8(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+1, fmtu8, val, comment))
     return val
 
-def tagUint16(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    val = uint16(FP, peek)
+def tagUint16(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = uint16(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+2, fmtu16, name, val, comment))
@@ -318,9 +318,9 @@ def tagUint16(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+2, fmtu16, val, comment))
     return val
 
-def tagUint32(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    val = uint32(FP, peek)
+def tagUint32(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = uint32(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmtu32, name, val, comment))
@@ -328,9 +328,9 @@ def tagUint32(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmtu32, val, comment))
     return val
 
-def tagInt32(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    val = int32(FP, peek)
+def tagInt32(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = int32(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmtu32, name, val, comment))
@@ -338,9 +338,9 @@ def tagInt32(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmtu32, val, comment))
     return val
 
-def tagUint64(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    val = uint64(FP, peek)
+def tagUint64(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = uint64(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+8, fmtu64, name, val, comment))
@@ -348,9 +348,9 @@ def tagUint64(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+8, fmtu64, val, comment))
     return val
 
-def tagInt64(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    val = int64(FP, peek)
+def tagInt64(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = int64(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) %s %s=%d %s' % (pos, pos+8, fmt64, name, val, comment))
@@ -358,9 +358,9 @@ def tagInt64(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) %s %d %s' % (pos, pos+8, fmt64, val, comment))
     return val
 
-def tagUleb128(FP, name, comment='', peek=0):
-    pos = FP.tell()
-    (val, length) = uleb128(FP, peek)
+def tagUleb128(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    (val, length) = uleb128(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) uleb128 %s=0x%X %s' % (pos, pos+length, name, val, comment))
@@ -368,18 +368,18 @@ def tagUleb128(FP, name, comment='', peek=0):
         print('[0x%X,0x%X) uleb128 0x%X %s' % (pos, pos+length, val, comment))
     return val
 
-def tagString(FP, length, name, peek=0):
-    pos = FP.tell()
-    val = string(FP, length, peek)
+def tagString(fp, length, name, peek=0):
+    pos = fp.tell()
+    val = string(fp, length, peek)
     if name:
         print('[0x%X,0x%X) string %s=\"%s\"' % (pos, pos+length, name, val))
     else:
         print('[0x%X,0x%X) string \"%s\"' % (pos, pos+length, val))
     return val
 
-def tagStringNull(FP, name, peek=0):
-    pos = FP.tell()
-    val = string_null(FP, peek)
+def tagStringNull(fp, name, peek=0):
+    pos = fp.tell()
+    val = string_null(fp, peek)
     length = len(val) + 1
     if name:
         print('[0x%X,0x%X) string %s=\"%s\"' % (pos, pos+length, name, val))
@@ -387,9 +387,9 @@ def tagStringNull(FP, name, peek=0):
         print('[0x%X,0x%X) string \"%s\"' % (pos, pos+length, val))
     return val
 
-def tagDataUntil(FP, term, name, comment, peek=0):
-    pos = FP.tell()
-    data = dataUntil(FP, term, peek)
+def tagDataUntil(fp, term, name, comment, peek=0):
+    pos = fp.tell()
+    data = dataUntil(fp, term, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
         print('[0x%X,0x%X) raw %s=\"%s\" %s' % (pos, pos+len(data), name, data, comment))
@@ -412,6 +412,11 @@ def tagFormat(fp, fmt, *names):
             assert False
 
     return result
+
+def tagPaddingUntilAlignment(fp, alignment):
+    residue = fp.tell() % alignment
+    if residue:
+        tag(fp, alignment - residue, 'padding')
 
 ###############################################################################
 # misc
