@@ -44,7 +44,7 @@ def ELF64_ST_TYPE(info):
 #     Elf64_Sxword	r_addend;		/* Addend */
 # } Elf64_Rela;
 def tag_elf64_rela(fp, machine:E_MACHINE=None):
-    tag(fp, 24, 'Elf64_Rela', True)
+    tag(fp, 24, 'Elf64_Rela', '', peek=True)
     tagUint64(fp, 'r_offset')
 
     # info is type.24|id.8
@@ -190,17 +190,16 @@ def tag_elf64_phdr(fp, index):
 def analyze(fp):
     if not isElf64(fp):
         return
-    tag(fp, SIZEOF_ELF64_HDR, "elf64_hdr", 1)
+    tag(fp, SIZEOF_ELF64_HDR, "elf64_hdr", '', peek=True)
     tag(fp, 4, "e_ident[0..4)")
-    tagUint8(fp, "e_ident[EI_CLASS] (64-bit)")
-    ei_data = uint8(fp, 1)
-    tagUint8(fp, "e_ident[EI_DATA] %s" % ei_data_tostr(ei_data))
-    assert(ei_data in [ELFDATA2LSB,ELFDATA2MSB])
+    tagUint8(fp, "e_ident[EI_CLASS]", '(64-bit)')
+    ei_data = tagUint8(fp, "e_ident[EI_DATA]", ei_data_tostr)
+    assert(ei_data in [ELFDATA2LSB, ELFDATA2MSB])
     if ei_data == ELFDATA2LSB:
         setLittleEndian()
     elif ei_data == ELFDATA2MSB:
         setBigEndian()
-    tagUint8(fp, "e_ident[EI_VERSION] (%s-end)" % ('little' if ei_data==ELFDATA2LSB else 'big'))
+    tagUint8(fp, "e_ident[EI_VERSION]", "(%s-end)" % ('little' if ei_data==ELFDATA2LSB else 'big'))
     tagUint8(fp, "e_ident[EI_OSABI]")
     tagUint8(fp, "e_ident[EI_ABIVERSION]")
     tag(fp, 7, "e_ident[EI_PAD]")
@@ -208,7 +207,7 @@ def analyze(fp):
     e_type = uint16(fp, 1)
     tagUint16(fp, "e_type %s" % e_type_tostr(e_type))
     e_machine = uint16(fp, 1)
-    tagUint16(fp, "e_machine %s" % (e_machine_tostr(e_machine)))
+    tagUint16(fp, "e_machine", e_machine_tostr)
     tagUint32(fp, "e_version")
     tagUint64(fp, "e_entry")
     e_phoff = tagUint64(fp, "e_phoff")
@@ -356,7 +355,7 @@ def analyze(fp):
             (len_header, len_body) = dwarf.tag_compilation_unit_header(fp)
 
             fp.seek(cu_base + len_header)
-            tag(fp, len_body, 'compilation unit contents', True)
+            tag(fp, len_body, 'compilation unit contents', '', peek=True)
 
             #tagUleb128(fp, "abbrev_code")
 
