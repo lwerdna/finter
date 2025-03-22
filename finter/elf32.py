@@ -12,7 +12,7 @@ from .helpers import *
 #        Elf32_Word      r_info;
 #} Elf32_Rel;
 def tag_elf32_rel(fp, machine:E_MACHINE=None):
-    tag(fp, 8, 'Elf32_Rel', 1)
+    tag(fp, 8, 'Elf32_Rel', '', peek=True)
 
     #r_offset = uint32(fp, 1)
     tagUint32(fp, 'r_offset') # location relocation is applied
@@ -35,7 +35,7 @@ def tag_elf32_rel(fp, machine:E_MACHINE=None):
 #        Elf32_Sword     r_addend;
 #} Elf32_Rela;
 def tag_elf32_rela(fp):
-    tag(fp, 12, 'Elf32_Rela', 1)
+    tag(fp, 12, 'Elf32_Rela', '', peek=True)
     tag(fp, 4, 'r_offset')
     tag(fp, 4, 'r_info')
     tag(fp, 4, 'r_addend')
@@ -148,11 +148,11 @@ def analyze(fp):
            return
 
     # read elf32_hdr
-    tag(fp, SIZEOF_ELF32_HDR, "elf32_hdr", 1)
+    tag(fp, SIZEOF_ELF32_HDR, "elf32_hdr", '', peek=True)
     tag(fp, 4, "e_ident[0..4)")
-    tagUint8(fp, "e_ident[EI_CLASS] (32-bit)")
+    tagUint8(fp, "e_ident[EI_CLASS]", "(32-bit)")
     ei_data = uint8(fp, 1)
-    tagUint8(fp, "e_ident[EI_DATA] %s" % ei_data_tostr(ei_data))
+    tagUint8(fp, "e_ident[EI_DATA]", ei_data_tostr(ei_data))
     assert(ei_data in [ELFDATA2LSB,ELFDATA2MSB])
     if ei_data == ELFDATA2LSB:
         setLittleEndian()

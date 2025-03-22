@@ -24,7 +24,11 @@ FPATH=$HOME/repos/lwerdna/filesamples
 ./oha.py h264_annexb $FPATH/lena_annexb.h264
 ./oha.py avcc $FPATH/lena-avcc-data.bin
 ./oha.py avcc_extradata $FPATH/lena-avcc-extradata.bin
-./oha.py avcc_extradata $FPATH/ls-x86_64
+./oha.py $FPATH/ls-x86_64
+./oha.py $FPATH/hello-aarch64-linux-gnu
+./oha.py $FPATH/hello-arm-linux-gnueabi
+./oha.py $FPATH/hello-arm-linux-gnueabihf
+./oha.py $FPATH/hello-mips-linux-gnu
 
 #FPATH=$HOME/fdumps/filesamples
 #
