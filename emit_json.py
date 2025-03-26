@@ -8,7 +8,7 @@ import json
 import struct
 import binascii
 
-from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, finter_type_to_struct_fmt
+from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, finter_type_to_struct_fmt, handle_argv_common_utility
 
 # we'll augment the default node type with the ability to produce a python
 # data structure serializable to json
@@ -68,16 +68,11 @@ class JsonNode(FinterNode):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('ERROR: missing file parameter')
-        print('usage: %s <file>' % sys.argv[0])
-        sys.exit(-1)
+    dissector, fpath, offset = handle_argv_common_utility()
 
-    fpath = sys.argv[1]
+    intervals = dissect_file(fpath, offset, dissector)
 
-    interval_tree = dissect_file(fpath)
-
-    root = intervals_to_tree(interval_tree, JsonNode)
+    root = intervals_to_tree(intervals, JsonNode)
 
     sorted_children = sorted(root.children, key=lambda x: x.begin)
 
@@ -86,7 +81,10 @@ if __name__ == '__main__':
         graph(root)
         sys.exit(-1)
 
-    with open(sys.argv[1], 'rb') as fp:
+    breakpoint()
+
+    with open(fpath, 'rb') as fp:
         root.set_fp(fp)
+
         ds = root.data_structify()
         print(json.dumps(ds, indent=4))
