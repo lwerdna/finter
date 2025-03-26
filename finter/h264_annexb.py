@@ -12,36 +12,6 @@ from .helpers import *
 
 from . import h264
 
-# assumes fp is positioned at a start code
-# returns (start_code_len, nalu_len)
-# very inefficient, does large reads to the end of the file from each start code
-def seek_nalu(fp):
-    home = fp.tell()
-
-    buffer = fp.read()
-
-    # read start code
-    sclen = None
-    if buffer[0:3] == b'\x00\x00\x01':
-        sclen = 3
-    elif buffer[0:4] ==  b'\x00\x00\x00\x01':
-        sclen = 4
-    if sclen is None:
-        raise Exception(f'expected start code at offset 0x{home:X}')
-   
-    # find next start code
-    end = buffer.find(b'\x00\x00\x01', sclen)
-    if end == -1:
-        nalu_len = len(buffer) - sclen
-    else:
-        if buffer[end-1] == 0:
-            end -= 1
-        nalu_len = end - sclen
-
-    # back home
-    fp.seek(home, io.SEEK_SET)
-    return (sclen, nalu_len)
-
 ###############################################################################
 # "main"
 ###############################################################################
@@ -49,10 +19,39 @@ def seek_nalu(fp):
 def analyze(fp):
     setLittleEndian()
 
-    while not IsEof(fp):
-        sclen, nalulen = seek_nalu(fp)
-        tag(fp, sclen, 'start code')
-        h264.tag_nalu(fp, nalulen)
+    code3 = b'\x00\x00\x01'
+    code4 = b'\x00\x00\x00\x01'
+
+    # does this file start with a start code (h264 delimeter)?
+    sample = peek(fp, 4)
+    if sample == code3:
+        code = code3
+    elif sample == code4:
+        code = code4
+    else:
+        return
+
+    # precompute location of all start codes
+    #
+    # |code|nalu|code|nalu|...|code|nalu|
+    # ^         ^             ^
+    data = fp.read()
+    start_locs = []
+    i = 0
+    while True:
+        if (i := data.find(code, i)) == -1:
+            break
+        start_locs.append(i)
+        i += len(code)
+
+    # |code|nalu|code|nalu|...|code|nalu|
+    # ^         ^
+    # a         b
+    for a, b in zip(start_locs, start_locs[1:] + [len(data)]):
+        fp.seek(a)
+        tag(fp, len(code), 'start code')
+        len_nalu = b - (a + len(code))
+        h264.tag_nalu(fp, len_nalu)
 
 if __name__ == '__main__':
     import sys
