@@ -7,7 +7,7 @@ import sys
 import struct
 import binascii
 
-from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, finter_type_to_struct_fmt
+from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, finter_type_to_struct_fmt, handle_argv_common_utility
 
 class MyNode(FinterNode):
     def __init__(self, begin, end, type_, comment):
@@ -65,14 +65,9 @@ class MyNode(FinterNode):
                     print(f'{indent}\'{self.name}\': slurp(0x{self.begin:X}, 0x{self.end:X}, \'{fmt}\'){extra}')
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('ERROR: missing file parameter')
-        print('usage: %s <file>' % sys.argv[0])
-        sys.exit(-1)
+    dissector, fpath, offset = handle_argv_common_utility()
 
-    fpath = sys.argv[1]
-
-    interval_tree = dissect_file(fpath)
+    interval_tree = dissect_file(fpath, offset, dissector)
 
     root = intervals_to_tree(interval_tree, MyNode)
 
@@ -94,7 +89,7 @@ def read(fp):
             case _: return struct.unpack(fmt, data)[0]
 ''')
 
-    with open(sys.argv[1], 'rb') as fp:
+    with open(fpath, 'rb') as fp:
         root.set_fp(fp)
 
         print('    return {')

@@ -52,7 +52,7 @@ def tag_rtp(fp, length, channel=None):
         extension_id = tagUint16(fp, 'extension_id')
         extension_len = tagUint16(fp, 'extension_len')
         for i in range(extension_len):
-            tag(fp, 4, f'extensions[{i}]')
+            tagUint32(fp, f'extensions[{i}]')
         payload_length = length - (16 + 4*extension_len)
     else:
         payload_length = length - 12
@@ -67,8 +67,9 @@ def tag_rtp(fp, length, channel=None):
         payload_length -= padlen
         fp.seek(tmp)
 
-    tag(fp, payload_length, 'payload', '', peek=True)
-    h264.tag_nalu(fp, payload_length)
+    if payload_length:
+        tag(fp, payload_length, 'payload', '', peek=True)
+        h264.tag_nalu(fp, payload_length)
 
     if padlen:
         tag(fp, padlen, 'padding')
