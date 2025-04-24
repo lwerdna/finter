@@ -4,7 +4,7 @@
 # https://aeroquartet.com/treasured/mpeg.en.html
 # http://dvdnav.mplayerhq.hu/dvdinfo/mpeghdrs.html
 # https://github.com/kynesim/tstools/blob/master/ps.c
-# 
+# https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-mpeg-descriptor.c
 
 import io
 import sys
@@ -55,6 +55,243 @@ def stream_id_to_string(code):
     elif code == 0xff: return 'program stream directory'
     else: return 'unknown'
 
+def tag_picture_header(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+
+    frame_type = (peek(fp, 2)[1] >> 3) & 7
+
+    #tagBits(fp, \
+    #    ('temp_seq_num', 10),
+    #    ('frame_type', 3),
+    #    ('vbv_delay', 16)
+    #
+    tag(fp, 4, 'data')
+
+    tagFromPosition(fp, start, '', 'picture header')
+
+
+def tag_slice_header(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+
+    extra = 1
+    while extra == 1:
+        _, _, _, extra = tagBits(fp, \
+            ('quantiser_scale_code', 5),
+            ('intra_slice_flag', 1),
+            ('intra_slice', 1),
+            ('extra', 1)
+        )
+
+        if extra == 1:
+            tagUint8(fp, 'extra')
+
+    # TODO: finish this
+
+    tagFromPosition(fp, start, '', 'slice header')
+
+def tag_pack_header(fp):
+    mark = fp.tell()
+
+    tag_stream_header(fp)
+
+    # consume byte [4, 5, 6, 7, 8, 9]
+    bs = BitStream(peek(fp, 6))
+    assert bs.stream(2) == 1
+    scr = bs.stream(3)
+    assert bs.stream(1) == 1
+    scr = (scr << 15) | bs.stream(15)
+    assert bs.stream(1) == 1
+    scr = (scr << 15) | bs.stream(15)
+    assert bs.stream(1) == 1
+    scr_ext = bs.stream(9)
+    assert bs.stream(1) == 1
+
+    tag(fp, 6, '', f'scr={scr:X}h scr_ext={scr_ext:X}h')
+
+    # consume bytes [10, 11, 12, 13]
+    bs = BitStream(peek(fp, 4))
+    program_mux_rate = bs.stream(22)
+    assert bs.stream(2) == 3
+    reserved = bs.stream(5)
+    pack_stuffing_length = bs.stream(3)
+
+    tag(fp, 4, '', 'program_mux_rate=%Xh pack_stuffing_length=%Xh' % \
+        (program_mux_rate, pack_stuffing_length))
+
+    if pack_stuffing_length:
+        tag(fp, pack_stuffing_length, 'stuffing')
+
+    tagFromPosition(fp, mark, 'pack_header')
+
+def tag_video_stream_descriptor(fp):
+    # iso13818-1.pdf 2.6
+
+    mark = fp.tell()
+
+    tagUint8(fp, 'tag')
+    descriptor_length = tagUint8(fp, 'length')
+    
+    _, _, MPEG_1_only_flag, _, _ = tagBits(fp, \
+        ('multiple_frame_rate_flag', 1),
+        ('frame_rate_code', 4),
+        ('MPEG_1_only_flag', 1),
+        ('constrained_parameter_flag', 1),
+        ('still_picture_flag', 1)
+    )
+
+    if MPEG_1_only_flag == 0:
+        tagUint8(fp, 'profile_level_indication')
+
+    tagBits(fp, \
+        ('chroma_format', 2),
+        ('frame_rate_extension_flag', 1),
+        ('reserved', 5)
+    )
+
+    tagFromPosition(fp, mark, 'video_stream_descriptor')
+
+def tag_program_element_descriptor(fp):
+    # iso13818-1.pdf 2.6
+
+    mark = fp.tell()
+
+    tagUint8(fp, 'tag')
+    descriptor_length = tagUint8(fp, 'length')
+    
+    tag(fp, descriptor_length, 'data')
+
+    tagFromPosition(fp, mark, 'program_element_descriptor')
+
+def tag_elementary_stream_map_entry(fp):
+    start = fp.tell()
+    tagUint8(fp, 'type')
+    tagUint8(fp, 'id')
+    length = tagUint16(fp, 'length')
+    tag(fp, length, 'data')
+    tagFromPosition(fp, start, 'elem_stream_map_entry')
+
+def tag_program_stream_map(fp):
+    # iso13818-1.pdf 2.5.4.1
+    start = fp.tell()
+
+    tag_stream_header(fp)
+
+    tagUint16(fp, 'program_stream_map_length')
+
+    current_next_indicator, reserved, program_stream_map_version = \
+        bitsplit(peek(fp, 1), 1, 2, 5)
+    tagUint8(fp, '', 'current_next_indicator=%Xh program_stream_map_version=%Xh' % \
+        (current_next_indicator, program_stream_map_version))
+
+    reserved, marker_bit = \
+    	bitsplit(peek(fp, 1), 7, 1)
+    tagUint8(fp, '', 'reserved=%Xh marker_bit=%Xh' % \
+        (reserved, marker_bit))
+
+    program_stream_info_length = tagUint16(fp, 'program_stream_info_length')
+
+    # consume program descriptors
+    mark = fp.tell()
+    while fp.tell() - mark < program_stream_info_length:
+        tag_program_element_descriptor(fp)
+    tagFromPosition(fp, mark, 'program_streams')
+
+    elementary_stream_map_length = tagUint16(fp, 'elementary_stream_map_length')
+
+    # consume elementary streams
+    mark = fp.tell()
+    while fp.tell() - mark < elementary_stream_map_length:
+        tag_elementary_stream_map_entry(fp)
+    tagFromPosition(fp, mark, 'elementary_streams')
+
+    tagUint32(fp, 'crc')
+
+    tagFromPosition(fp, start, 'program_stream_map')
+
+def tag_mpeg1_or_mpeg2_video_stream_limit1(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+    length = tagUint16(fp, 'length')
+    tag(fp, length, 'data')
+
+    tagFromPosition(fp, start, 'packetized_elem_stream')
+
+def tag_sequence_header(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+
+    tagBits(fp, \
+        ('horiz_sz', 12),
+        ('vert_sz', 12)
+    )
+
+    tagBits(fp, \
+        ('aspect_ratio', 4),
+        ('frame_rate', 4),
+    )
+
+    _, _, _, _, m0, m1 = tagBits(fp, \
+        ('bit_rate', 18),
+        ('1', 1),
+        ('vbv_buf_sz', 10),
+        ('constr_params_flag', 1),
+        ('load_intra_quant_matrix', 1),
+        ('load_non_intra_quant_matrix', 1)
+    )
+
+    if m0 or m1:
+        tag(fp, 8, 'table')
+
+    tagFromPosition(fp, start, 'sequence_header')
+
+def tag_private_stream_1(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+    length = tagUint16(fp, 'length')
+    tag(fp, length, 'data')
+
+    tagFromPosition(fp, start, 'private_stream_1')
+
+def tag_extension_header(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+    ext_type = peek(fp, 1)[0] >> 4
+    if ext_type == 1:
+        tag(fp, 6, '', 'sequence data')
+    elif ext_type == 2:
+        tag(fp, 12, '', 'sequence display data')
+    elif ext_type == 8:
+        tag(fp, 5, '', 'picture coding data')
+
+    tagFromPosition(fp, start, 'extension')
+
+def tag_gop(fp):
+    start = fp.tell()
+
+    tag_stream_header(fp)
+    tag(fp, 4, 'data')
+
+    tagFromPosition(fp, start, '', 'group of pictures')
+
+def tag_stream_header(fp):
+    tag(fp, 4, 'stream_header', '', peek=True)
+    tag(fp, 3, 'prefix')
+    return tagUint8(fp, 'id', lambda x: '('+stream_id_to_string(x)+')')
+
+def is_at_header(fp):
+    sample = int.from_bytes(peek(fp, 4), 'big')
+    prefix = sample >> 8
+    stream_id = sample & 0xff
+    return prefix == 1 and stream_id_to_string(stream_id) != 'unknown'
+
 ###############################################################################
 # "main"
 ###############################################################################
@@ -62,62 +299,35 @@ def stream_id_to_string(code):
 def analyze(fp):
     setBigEndian()
 
-    sample = int.from_bytes(peek(fp, 4), 'big')
-    prefix = sample >> 8
-    stream_id = sample & 0xff
-    if prefix == 1 and stream_id_to_string(stream_id) == 'unknown':
-        return
+    while (not IsEof(fp)):
+        if not is_at_header(fp):
+            break
 
-    if stream_id == 0xba:
-        mark = fp.tell()
+        stream_id = peek(fp, 4)[3]
 
-        tag(fp, 3, 'packet_start_code_prefix')
-        tagUint8(fp, 'map_stream_id')
+        if stream_id == 0:
+            tag_picture_header(fp)
+        elif 1 <= stream_id <= 0xaf:
+            tag_slice_header(fp)
+        elif stream_id == 0xba:
+            tag_pack_header(fp)
+        elif stream_id == 0xe0:
+            tag_mpeg1_or_mpeg2_video_stream_limit1(fp)
+        elif stream_id == 0xb3:
+            tag_sequence_header(fp)
+        elif stream_id == 0xb5:
+            tag_extension_header(fp)
+        elif stream_id == 0xb8:
+            tag_gop(fp)
+        elif stream_id == 0xbc:
+            tag_program_stream_map(fp)
+        elif stream_id == 0xbd:
+            tag_private_stream_1(fp)
+        else:
+            tag_stream_header(fp)
 
-        # consume byte [4, 5, 6, 7, 8, 9]
-        bs = BitStream(peek(fp, 6))
-        assert bs.stream(2) == 1
-        scr = bs.stream(3)
-        assert bs.stream(1) == 1
-        scr = (scr << 15) | bs.stream(15)
-        assert bs.stream(1) == 1
-        scr = (scr << 15) | bs.stream(15)
-        assert bs.stream(1) == 1
-        scr_ext = bs.stream(9)
-        assert bs.stream(1) == 1
-        
-        tag(fp, 6, 'anon', f'scr={scr:X}h scr_ext={scr_ext:X}h')
-    
-        # consume bytes [10, 11, 12, 13]
-        bs = BitStream(peek(fp, 4))
-        program_mux_rate = bs.stream(22)
-        assert bs.stream(2) == 3
-        reserved = bs.stream(5)
-        pack_stuffing_length = bs.stream(3)
-
-        tag(fp, 4, 'anon', 'program_mux_rate=%Xh pack_stuffing_length=%Xh' % \
-            (program_mux_rate, pack_stuffing_length))
-
-        if pack_stuffing_length:
-            tag(fp, pack_stuffing_length, 'stuffing')
-
-        tagFromPosition(fp, mark, 'pack_header')
-
-    # iso13818-1.pdf 2.5.4.1
-    elif stream_id == 0xbc:
-        mark = fp.tell()
-
-        tag(fp, 3, 'packet_start_code_prefix')
-        tagUint8(fp, 'map_stream_id')
-
-        tag(fp, 2, 'program_stream_map_length')
-
-        current_next_indicator, reserved, program_stream_map_version = \
-            bitsplit(peek(fp, 1), 1, 2, 5)
-        tagUint8(fp, 'current_next_indicator=%Xh program_stream_map_version=%Xh' % \
-            (current_next_indicator, program_stream_map_version))
-        
-        tagFromPosition(fp, mark, 'program stream map')
+        if not is_at_header(fp):
+            break
 
 if __name__ == '__main__':
     import sys

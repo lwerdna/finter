@@ -279,11 +279,16 @@ def dataUntil(fp, terminator, peek=0):
 # taggers
 ###############################################################################
 
-def tag(fp, length, name, comment='', peek=0):
+def tag(fp, length, name, comment='', peek=False):
     pos = fp.tell()
     val = fp.read(length)
     if type(comment) == types.FunctionType: comment = comment(val)
-    print('[0x%X,0x%X) raw %s %s' % (pos, pos+length, name, comment))
+
+    if name:
+        print('[0x%X,0x%X) raw %s %s' % (pos, pos+length, name, comment))
+    else:
+        print('[0x%X,0x%X) raw %s' % (pos, pos+length, comment))
+
     if peek: fp.seek(pos)
     return val
 
@@ -417,6 +422,32 @@ def tagPaddingUntilAlignment(fp, alignment):
     residue = fp.tell() % alignment
     if residue:
         tag(fp, alignment - residue, 'padding')
+
+# parts are (name, len) tuples
+# eg: tagBits(fp, ('foo', 1), ('bar', 2), ('baz', 5))
+# lengths must sum to multiple of 8 so we can do a byte read
+def tagBits(fp, *parts):
+    values = []
+    num_bits = sum(x[1] for x in parts)
+    assert num_bits % 8 == 0
+    num_bytes = num_bits // 8
+
+    # create bit streamer
+    bs = BitStream(peek(fp, num_bytes))
+
+    # build the description
+    descr = []
+    for (name, l) in parts:
+        val = bs.stream(l)
+        values.append(val)
+        descr.append(f'{name}={val:X}h')
+    descr = ' '.join(descr)
+
+    # tag it
+    tag(fp, num_bytes, 'anon', descr)
+
+    # return the tagged values
+    return values
 
 ###############################################################################
 # misc
