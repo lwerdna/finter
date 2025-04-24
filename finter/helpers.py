@@ -440,11 +440,13 @@ def tagBits(fp, *parts):
     for (name, l) in parts:
         val = bs.stream(l)
         values.append(val)
-        descr.append(f'{name}={val:X}h')
+
+        if name:
+            descr.append(f'{name}={val:X}h')
     descr = ' '.join(descr)
 
     # tag it
-    tag(fp, num_bytes, 'anon', descr)
+    tag(fp, num_bytes, '', descr)
 
     # return the tagged values
     return values

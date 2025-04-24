@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# ffmpeg -loglevel debug -i input.mpeg -f null -
+# ffprobe -show_streams -show_packets -show_frames -bitexact input.mpeg
 # ffprobe -v error -show_format -show_streams input.mpeg
 # https://aeroquartet.com/treasured/mpeg.en.html
 # http://dvdnav.mplayerhq.hu/dvdinfo/mpeghdrs.html
@@ -134,7 +136,7 @@ def tag_video_stream_descriptor(fp):
 
     tagUint8(fp, 'tag')
     descriptor_length = tagUint8(fp, 'length')
-    
+
     _, _, MPEG_1_only_flag, _, _ = tagBits(fp, \
         ('multiple_frame_rate_flag', 1),
         ('frame_rate_code', 4),
@@ -161,7 +163,7 @@ def tag_program_element_descriptor(fp):
 
     tagUint8(fp, 'tag')
     descriptor_length = tagUint8(fp, 'length')
-    
+
     tag(fp, descriptor_length, 'data')
 
     tagFromPosition(fp, mark, 'program_element_descriptor')
@@ -212,14 +214,113 @@ def tag_program_stream_map(fp):
 
     tagFromPosition(fp, start, 'program_stream_map')
 
-def tag_mpeg1_or_mpeg2_video_stream_limit1(fp):
+def tag_pts(fp, alone=True):
+    pts = 0
+    bs = BitStream(peek(fp, 5))
+    assert bs.stream(4) == (0b0010 if alone else 0b0011)
+    pts = (pts << 3) | bs.stream(3)
+    assert bs.stream(1) == 1
+    pts = (pts << 15) | bs.stream(15)
+    assert bs.stream(1) == 1
+    pts = (pts << 15) | bs.stream(15)
+    assert bs.stream(1) == 1
+    tag(fp, 5, f'pts={pts:X}h')
+    return pts
+
+def tag_dts(fp):
+    dts = 0
+    bs = BitStream(peek(fp, 5))
+    assert bs.stream(4) == 0b0001
+    dts = (dts << 3) | bs.stream(3)
+    assert bs.stream(1) == 1
+    dts = (dts << 15) | bs.stream(15)
+    assert bs.stream(1) == 1
+    dts = (dts << 15) | bs.stream(15)
+    assert bs.stream(1) == 1
+    tag(fp, 5, f'dts={dts:X}h')
+    return dts
+
+def tag_pes_header(fp):
+    start = fp.tell()
+
+    tagBits(fp, \
+        ('', 2),
+        ('pes_scramble', 2),
+        ('pes_pri', 1),
+        ('align', 1),
+        ('copyright', 1),
+        ('orig_or_copy', 1)
+    )
+
+    pts, dts, escr, es_rate, _, add_copy_info, pes_crc, pes_ext = tagBits(fp, \
+        ('pts', 1),
+        ('dts', 1),
+        ('escr', 1),
+        ('es_rate', 1),
+        ('dsm_trick', 1),
+        ('add_copy_info', 1),
+        ('pes_crc', 1),
+        ('pes_ext', 1)
+    )
+
+    pes_hdr_data_len = tagUint8(fp, 'pes_hdr_data_len')
+
+    remaining = pes_hdr_data_len
+
+    if pts==0 and dts==0:
+        pass
+    elif pts==0 and dts==1:
+        # forbidden
+        pass
+    elif pts==1 and dts==0:
+        tag_pts(fp, alone=True)
+        remaining -= 5
+    elif pts==1 and dts==1:
+        tag_pts(fp, alone=False)
+        tag_dts(fp)
+        remaining -= 10
+
+    if escr:
+        tag(fp, 6, '', 'escr data')
+        remaining -= 6
+
+    if es_rate:
+        tag(fp, 3, '', 'es rate data')
+        remaining -= 3
+
+    if add_copy_info:
+        tag(fp, 1, '', 'additional copy info')
+        remaining -= 1
+
+    if pes_crc:
+        tag(fp, 2, '', 'pes crc info')
+        remaining -= 2
+
+    if pes_ext:
+        tag(fp, 1, '', 'pes extension info')
+        remaining -= 1
+
+    # TODO: pes private data flag, pack header field flag, seq counter, etc.
+
+    if remaining:
+        tag(fp, remaining, 'stuffing')
+
+    tagFromPosition(fp, start, 'pes_header')
+
+# table E.1
+def tag_pes(fp):
     start = fp.tell()
 
     tag_stream_header(fp)
     length = tagUint16(fp, 'length')
-    tag(fp, length, 'data')
 
-    tagFromPosition(fp, start, 'packetized_elem_stream')
+    mark = fp.tell()
+    tag_pes_header(fp)
+    pes_hdr_len = fp.tell() - mark
+
+    tag(fp, length-pes_hdr_len, 'payload')
+
+    tagFromPosition(fp, start, '', 'packetized elementary stream (PES)')
 
 def tag_sequence_header(fp):
     start = fp.tell()
@@ -249,15 +350,6 @@ def tag_sequence_header(fp):
         tag(fp, 8, 'table')
 
     tagFromPosition(fp, start, 'sequence_header')
-
-def tag_private_stream_1(fp):
-    start = fp.tell()
-
-    tag_stream_header(fp)
-    length = tagUint16(fp, 'length')
-    tag(fp, length, 'data')
-
-    tagFromPosition(fp, start, 'private_stream_1')
 
 def tag_extension_header(fp):
     start = fp.tell()
@@ -312,7 +404,7 @@ def analyze(fp):
         elif stream_id == 0xba:
             tag_pack_header(fp)
         elif stream_id == 0xe0:
-            tag_mpeg1_or_mpeg2_video_stream_limit1(fp)
+            tag_pes(fp)
         elif stream_id == 0xb3:
             tag_sequence_header(fp)
         elif stream_id == 0xb5:
@@ -322,7 +414,7 @@ def analyze(fp):
         elif stream_id == 0xbc:
             tag_program_stream_map(fp)
         elif stream_id == 0xbd:
-            tag_private_stream_1(fp)
+            tag_pes(fp)
         else:
             tag_stream_header(fp)
 
