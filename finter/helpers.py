@@ -436,6 +436,37 @@ def flags_string(flags:enum.Enum, x:int):
             result.append(member.name)
     return '|'.join(result)
 
+class BitStream():
+    def __init__(self, data):
+        self.val = int.from_bytes(data, 'big')
+        self.i = 8 * len(data) - 1
+
+    def stream(self, sz):
+        result = 0
+
+        for j in range(sz):
+            # access current bit
+            if self.i < 0:
+                raise Exception('exhausted bits')
+
+            bit = 1 if self.val & (1 << self.i) else 0
+
+            # add to result
+            result = (result << 1) | bit
+
+            # update
+            self.i = self.i - 1
+
+        return result
+
+# bitsplit(b'\xAA', 2, 3, 3) -> 10b, 101b, 010b
+def bitsplit(data, *lengths):
+    result = []
+    bs = BitStream(data)
+    for l in lengths:
+        result.append(bs.stream(l))
+    return tuple(result)
+
 ###############################################################################
 # main
 ###############################################################################
