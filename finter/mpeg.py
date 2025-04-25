@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# program stream is composed of elementary streams like video, audio, subtitles, etc.
+
 # ffmpeg -loglevel debug -i input.mpeg -f null -
 # ffprobe -show_streams -show_packets -show_frames -bitexact input.mpeg
 # ffprobe -v error -show_format -show_streams input.mpeg
@@ -56,6 +58,50 @@ def stream_id_to_string(code):
     elif 0xaf <= code <= 0xfe: return 'reserved'
     elif code == 0xff: return 'program stream directory'
     else: return 'unknown'
+
+def program_elem_descr_tag_to_string(tag):
+    descriptor_table = {
+        0x00: "Reserved",
+        0x01: "Forbidden",
+        0x02: "Video stream descriptor",
+        0x03: "Audio stream descriptor",
+        0x04: "Hierarchy descriptor",
+        0x05: "Registration descriptor",
+        0x06: "Data stream alignment descriptor",
+        0x07: "Target background grid descriptor",
+        0x08: "Video window descriptor",
+        0x09: "CA (Conditional Access) descriptor",
+        0x0A: "ISO 639 language descriptor",
+        0x0B: "System clock descriptor",
+        0x0C: "Multiplex buffer utilization descriptor",
+        0x0D: "Copyright descriptor",
+        0x0E: "Maximum bitrate descriptor",
+        0x0F: "Private data indicator descriptor",
+        0x10: "Smoothing buffer descriptor",
+        0x11: "STD descriptor",
+        0x12: "IBP descriptor",
+        0x1B: "MPEG-4 video descriptor",
+        0x1C: "MPEG-4 audio descriptor",
+        0x1D: "IOD descriptor",
+        0x1E: "SL descriptor",
+        0x1F: "FMC descriptor",
+        0x20: "External ES ID descriptor",
+        0x21: "MuxCode descriptor",
+        0x22: "FmxBufferSize descriptor",
+        0x23: "MultiplexBuffer descriptor",
+        0x24: "Content labeling descriptor",
+        0x28: "AVC video descriptor",  # Common in DVB
+    }
+
+    # Reserved for ISO/IEC use
+    if 0x25 <= tag <= 0x3F:
+        return "Reserved (ISO/IEC use)"
+
+    # Private use
+    if 0x40 <= tag <= 0xFF:
+        return "Private use (vendor-defined)"
+
+    return descriptor_table.get(tag, "unknown")
 
 def tag_picture_header(fp):
     start = fp.tell()
@@ -161,7 +207,7 @@ def tag_program_element_descriptor(fp):
 
     mark = fp.tell()
 
-    tagUint8(fp, 'tag')
+    tagUint8(fp, 'tag', lambda x: program_elem_descr_tag_to_string(x))
     descriptor_length = tagUint8(fp, 'length')
 
     tag(fp, descriptor_length, 'data')
@@ -184,15 +230,16 @@ def tag_program_stream_map(fp):
 
     tagUint16(fp, 'program_stream_map_length')
 
-    current_next_indicator, reserved, program_stream_map_version = \
-        bitsplit(peek(fp, 1), 1, 2, 5)
-    tagUint8(fp, '', 'current_next_indicator=%Xh program_stream_map_version=%Xh' % \
-        (current_next_indicator, program_stream_map_version))
+    tagBits(fp, \
+        ('current_next_indicator', 1),
+        ('reserved', 2),
+        ('version', 5)
+    )
 
-    reserved, marker_bit = \
-    	bitsplit(peek(fp, 1), 7, 1)
-    tagUint8(fp, '', 'reserved=%Xh marker_bit=%Xh' % \
-        (reserved, marker_bit))
+    tagBits(fp, \
+        ('reserved', 7),
+        ('marker', 1)
+    )
 
     program_stream_info_length = tagUint16(fp, 'program_stream_info_length')
 
