@@ -20,44 +20,68 @@ from .helpers import *
 
 from . import h264
 
-def stream_id_to_string(code):
-    if code == 0: return 'picture'
-    elif 1 <= code <= 0xaf: return 'slice'
-    elif code in [0xb0, 0xb1]: return 'reserved'
-    elif code == 0xb2: return 'user data'
-    elif code == 0xb3: return 'sequence header'
-    elif code == 0xb4: return 'sequence error'
-    elif code == 0xb5: return 'extension'
-    elif code == 0xb6: return 'reserved'
-    elif code == 0xb7: return 'sequence end'
-    elif code == 0xb8: return 'group of pictures'
+# NOTE: stream id is different than stream type
+def stream_id_to_string(id_):
+    if id_ == 0: return 'picture'
+    elif 1 <= id_ <= 0xaf: return 'slice'
+    elif id_ in [0xb0, 0xb1]: return 'reserved'
+    elif id_ == 0xb2: return 'user data'
+    elif id_ == 0xb3: return 'sequence header'
+    elif id_ == 0xb4: return 'sequence error'
+    elif id_ == 0xb5: return 'extension'
+    elif id_ == 0xb6: return 'reserved'
+    elif id_ == 0xb7: return 'sequence end'
+    elif id_ == 0xb8: return 'group of pictures'
 
-    # H.222 Program stream specific codes
-    elif code == 0xb9: return 'program end'
-    elif code == 0xba: return 'pack header'
-    elif code == 0xbb: return 'system header'
-    elif code == 0xbc: return 'program stream map'
+    # H.222 Program stream specific id_s
+    elif id_ == 0xb9: return 'program end'
+    elif id_ == 0xba: return 'pack header'
+    elif id_ == 0xbb: return 'system header'
+    elif id_ == 0xbc: return 'program stream map'
 
     # Other "simple" values from H.222 Table 2-18, page 32
-    elif code == 0xbd: return 'private stream 1'
-    elif code == 0xbe: return 'padding stream'
-    elif code == 0xbf: return 'private stream 2'
-    elif 0xc0 <= code <= 0xdf: return 'mpeg-1 or mpeg-2 audio stream'
-    elif 0xe0 <= code <= 0xef: return 'mpeg-1 or mpeg-2 video stream'
-    elif code == 0xf0: return 'ecm stream'
-    elif code == 0xf1: return 'emm stream'
-    elif code == 0xf2: return 'ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Annex A or ISO/IEC 13818-6_DSMCC_stream'
-    elif code == 0xf3: return 'ISO/IEC_13522_stream'
-    elif code == 0xf4: return 'ITU-T Rec. H.222.1 type A'
-    elif code == 0xf5: return 'ITU-T Rec. H.222.1 type B'
-    elif code == 0xf6: return 'ITU-T Rec. H.222.1 type C'
-    elif code == 0xf7: return 'ITU-T Rec. H.222.1 type D'
-    elif code == 0xf8: return 'ITU-T Rec. H.222.1 type E'
-    elif code == 0xf9: return 'ancillary stream'
+    elif id_ == 0xbd: return 'private stream 1'
+    elif id_ == 0xbe: return 'padding stream'
+    elif id_ == 0xbf: return 'private stream 2'
+    elif 0xc0 <= id_ <= 0xdf: return 'mpeg-1 or mpeg-2 audio stream'
+    elif 0xe0 <= id_ <= 0xef: return 'mpeg-1 or mpeg-2 video stream'
+    elif id_ == 0xf0: return 'ecm stream'
+    elif id_ == 0xf1: return 'emm stream'
+    elif id_ == 0xf2: return 'ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Annex A or ISO/IEC 13818-6_DSMCC_stream'
+    elif id_ == 0xf3: return 'ISO/IEC_13522_stream'
+    elif id_ == 0xf4: return 'ITU-T Rec. H.222.1 type A'
+    elif id_ == 0xf5: return 'ITU-T Rec. H.222.1 type B'
+    elif id_ == 0xf6: return 'ITU-T Rec. H.222.1 type C'
+    elif id_ == 0xf7: return 'ITU-T Rec. H.222.1 type D'
+    elif id_ == 0xf8: return 'ITU-T Rec. H.222.1 type E'
+    elif id_ == 0xf9: return 'ancillary stream'
 
-    elif 0xaf <= code <= 0xfe: return 'reserved'
-    elif code == 0xff: return 'program stream directory'
+    elif 0xaf <= id_ <= 0xfe: return 'reserved'
+    elif id_ == 0xff: return 'program stream directory'
     else: return 'unknown'
+
+def stream_type_to_string(type_):
+    stream_type_map = {
+        0x00: "Reserved",
+        0x01: "MPEG-1 Video",
+        0x02: "MPEG-2 Video",
+        0x03: "MPEG-1 Audio",
+        0x04: "MPEG-2 Audio",
+        0x05: "Private Sections",
+        0x06: "PES packets containing private data",
+        0x0F: "AAC Audio (MPEG-2 Part 7)",
+        0x10: "MPEG-4 Video",
+        0x11: "MPEG-4 LATM AAC Audio",
+        0x1B: "H.264 / AVC Video",
+        0x24: "H.265 / HEVC Video",
+        0x81: "AC-3 Audio (non-standard but widely used)",
+        0xBD: "Private Stream 1",
+        0xBE: "Padding Stream",
+        0xC0: "MPEG-1/MPEG-2 Audio Stream (ID range start)",
+        0xE0: "MPEG-1/MPEG-2 Video Stream (ID range start)"
+    }
+
+    return stream_type_map.get(type_, "unknown")
 
 def program_elem_descr_tag_to_string(tag):
     descriptor_table = {
@@ -102,6 +126,46 @@ def program_elem_descr_tag_to_string(tag):
         return "Private use (vendor-defined)"
 
     return descriptor_table.get(tag, "unknown")
+
+def descriptor_tag_to_string(tag):
+    descriptor_tags = {
+        0x02: "Video stream descriptor",
+        0x03: "Audio stream descriptor",
+        0x04: "Hierarchy descriptor",
+        0x05: "Registration descriptor",
+        0x06: "Data stream alignment descriptor",
+        0x07: "Target background grid descriptor",
+        0x08: "Video window descriptor",
+        0x09: "Conditional access (CA) descriptor",
+        0x0A: "ISO 639 language descriptor",
+        0x0B: "System clock descriptor",
+        0x0C: "Multiplex buffer utilization descriptor",
+        0x0D: "Copyright descriptor",
+        0x0E: "Maximum bitrate descriptor",
+        0x0F: "Private data indicator descriptor",
+        0x10: "Smoothing buffer descriptor",
+        0x11: "STD descriptor",
+        0x12: "IBP descriptor",
+        0x1B: "MPEG-4 video descriptor",
+        0x1C: "MPEG-4 audio descriptor",
+        0x1D: "IOD descriptor",
+        0x1E: "SL descriptor",
+        0x1F: "FMC descriptor",
+        0x20: "External ES ID descriptor",
+        0x21: "MuxCode descriptor",
+        0x22: "FmxBufferSize descriptor",
+        0x23: "MultiplexBuffer descriptor",
+        0x24: "Content labeling descriptor",
+        0x25: "Metadata descriptor",
+        0x28: "AVC video descriptor (H.264)",
+        0x2A: "AVC timing and HRD descriptor",
+        0x2F: "Extension descriptor",
+    }
+
+    if 0x40 <= tag <= 0xFF:
+        return "Private use"
+
+    return descriptor_tags.get(tag, 'unknown')
 
 def tag_picture_header(fp):
     start = fp.tell()
@@ -216,10 +280,21 @@ def tag_program_element_descriptor(fp):
 
 def tag_elementary_stream_map_entry(fp):
     start = fp.tell()
-    tagUint8(fp, 'type')
-    tagUint8(fp, 'id')
+    tagUint8(fp, 'type', lambda x: '('+stream_type_to_string(x)+')')
+    tagUint8(fp, 'id', lambda x: '('+stream_id_to_string(x)+')')
     length = tagUint16(fp, 'length')
-    tag(fp, length, 'data')
+
+    i = 0
+    remaining = length
+    while remaining:
+        mark = fp.tell()
+        descr_tag = tagUint8(fp, 'tag', lambda x: '('+descriptor_tag_to_string(x)+')')
+        descr_len = tagUint8(fp, 'length')
+        tag(fp, descr_len, 'data')
+        tagFromPosition(fp, mark, f'descriptor[{i}]')
+        i += 1
+        remaining -= (2 + descr_len)
+
     tagFromPosition(fp, start, 'elem_stream_map_entry')
 
 def tag_program_stream_map(fp):
@@ -358,12 +433,19 @@ def tag_pes_header(fp):
 def tag_pes(fp):
     start = fp.tell()
 
-    tag_stream_header(fp)
+    stream_id = tag_stream_header(fp)
     length = tagUint16(fp, 'length')
 
     mark = fp.tell()
     tag_pes_header(fp)
     pes_hdr_len = fp.tell() - mark
+
+    if 0:
+        if stream_id == 0xE0:
+            payload = peek(fp, length-pes_hdr_len)
+            if payload.startswith(b'\x00\x00\x00\x01'):
+                with open('/tmp/dumped.h265', 'ab') as fp2:
+                    fp2.write(payload)
 
     tag(fp, length-pes_hdr_len, 'payload')
 
