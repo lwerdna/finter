@@ -12,6 +12,8 @@ def analyze(fp):
     setBigEndian()
 
     while not IsEof(fp):
+        # 4 bytes for each length is most common, but really this could be
+        # 1,2,3 or 4 and is specified in the avcc extradata
         length = tagUint32(fp, 'length')
         h264.tag_nalu(fp, length)
 

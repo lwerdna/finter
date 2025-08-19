@@ -29,6 +29,7 @@ FPATH=$HOME/repos/lwerdna/filesamples
 ./oha.py $FPATH/hello-arm-linux-gnueabi
 ./oha.py $FPATH/hello-arm-linux-gnueabihf
 ./oha.py $FPATH/hello-mips-linux-gnu
+./oha.py $FPATH/vbmeta.img
 
 #FPATH=$HOME/fdumps/filesamples
 #

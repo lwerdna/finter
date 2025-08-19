@@ -93,7 +93,7 @@ def tag_tlv(fp):
     mark = fp.tell()
     indefinite = False
     length = tag_length(fp)
-    tagFromPosition(fp, mark, f'length: {length:X}h')
+    #tagFromPosition(fp, mark, f'length: {length:X}h')
 
     if nonprim:
         limit = fp.tell() + length
