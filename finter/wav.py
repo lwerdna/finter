@@ -53,7 +53,7 @@ def tag_subchunk_data(fp, n_channels, bits_per_sample):
             if bytes_per_sample == 1:
                 tagUint8(fp, f'ch_{i}')
             elif bytes_per_sample == 2:
-                tagUint16(fp, f'ch_{i}')
+                tagInt16(fp, f'ch_{i}')
             else:
                 tag(fp, 1, f'ch_{i}')
         length -= n_channels * bytes_per_sample

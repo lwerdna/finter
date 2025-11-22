@@ -323,6 +323,16 @@ def tagUint16(fp, name, comment='', peek=0):
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+2, fmtu16, val, comment))
     return val
 
+def tagInt16(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = int16(fp, peek)
+    if type(comment) == types.FunctionType: comment = comment(val)
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+2, fmt16, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+2, fmt16, val, comment))
+    return val
+
 def tagUint32(fp, name, comment='', peek=0):
     pos = fp.tell()
     val = uint32(fp, peek)
@@ -338,9 +348,9 @@ def tagInt32(fp, name, comment='', peek=0):
     val = int32(fp, peek)
     if type(comment) == types.FunctionType: comment = comment(val)
     if name:
-        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmtu32, name, val, comment))
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+4, fmt32, name, val, comment))
     else:
-        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmtu32, val, comment))
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+4, fmt32, val, comment))
     return val
 
 def tagUint64(fp, name, comment='', peek=0):
