@@ -22,6 +22,7 @@ FPATH=$HOME/repos/lwerdna/filesamples
 ./oha.py $FPATH/hello-mono-square.exe
 ./oha.py $FPATH/square-mono.dll
 ./oha.py h264_annexb $FPATH/lena_annexb.h264
+./oha.py h264_annexb $FPATH/color-bars.h264
 ./oha.py avcc $FPATH/lena-avcc-data.bin
 ./oha.py avcc_extradata $FPATH/lena-avcc-extradata.bin
 ./oha.py $FPATH/ls-x86_64

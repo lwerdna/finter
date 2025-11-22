@@ -39,5 +39,5 @@ if __name__ == '__main__':
     dot.append('}')
 
     print('\n'.join(dot))
-    sys.exit(0)
+    sys.exit(-1)
 

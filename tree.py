@@ -16,7 +16,7 @@ def print_recur(hnode, depth=0):
 if __name__ == '__main__':
     dissector, fpath, offset = handle_argv_common_utility()
     if not fpath:
-        sys.exit(0)
+        sys.exit(-1)
     intervals = dissect_file(fpath, offset, dissector)
     root = intervals_to_tree(intervals)
     print_recur(root)

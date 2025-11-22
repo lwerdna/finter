@@ -2,6 +2,7 @@
 #
 # display given file as offset, hex, ascii (OHA)
 
+import os
 import re
 import sys
 from helpers import dissect_file, intervals_from_text, intervals_to_tree, FinterNode, handle_argv_common_utility
@@ -91,13 +92,15 @@ def oha(data, addr, comment=None):
 if __name__ == '__main__':
     dissector, fpath, offset = handle_argv_common_utility()
 
-    if not fpath:
-        sys.exit(0)
+    if not fpath or not os.path.isfile(fpath):
+        print(f'ERROR: unable to locate file {fpath}')
+        sys.exit(-1)
 
     #print(f'dissector: {dissector}')
     intervals = dissect_file(fpath, offset, dissector)
     if not intervals:
-        sys.exit(0)
+        print(f'ERROR: dissector produced no data')
+        sys.exit(-1)
 
     root = intervals_to_tree(intervals, OHANode)
 

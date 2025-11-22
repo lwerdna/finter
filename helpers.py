@@ -266,6 +266,8 @@ def dissect_file(fpath, initial_offset=0, dissector_name=''):
     sys.stdout = old_stdout
 
     # lines to intervals
+    if not lines:
+        return []
     lines = lines.split('\n')
     intervals = intervals_from_text(lines)
 
@@ -285,28 +287,36 @@ def finter_type_to_struct_fmt(type_):
     return type_
 
 def handle_argv_common_utility():
+    def is_hex_int(string):
+        try:
+            int(string, 16)
+        except ValueError:
+            return False
+        return True
+
     dissector, fpath, offset = None, None, 0
 
-    if len(sys.argv) < 2:
-        print('ERROR: missing file parameter')
+    if not len(sys.argv) in [2, 3]:
+        print('ERROR: parameters')
         print('usage:')
         print('    %s [dissector] <file> [offset]' % sys.argv[0])
         print('')
         print('where offset is given in hex')
     else:
+        # scenario #1: finter called on a file
+        #          eg: ./finter file.bin
         if len(sys.argv)-1 == 1:
-            # ./finter file.bin
             fpath = sys.argv[1]
-        elif len(sys.argv)-1 == 2:
-            # ./finter file.bin 0x10
-            if os.path.isfile(sys.argv[1]):
-                fpath = sys.argv[1]
-                offset = int(sys.argv[2], 16)
-            # ./finter pe32 file.bin
-            else:
-                if os.path.isfile(sys.argv[2]):
-                    dissector = sys.argv[1]
-                    fpath = sys.argv[2]
+        # scenario #2: finter called on a file and given an offset
+        #          eg: ./finter file.bin 0x10
+        elif len(sys.argv)-1 == 2 and is_hex_int(sys.argv[2]):
+            fpath = sys.argv[1]
+            offset = int(sys.argv[2], 16)
+        # scenario #3: finter called with a dissector and a file
+        #          eg: ./finter pe32 file.bin
+        elif len(sys.argv)-1 == 2 and not is_hex_int(sys.argv[2]):
+            dissector = sys.argv[1]
+            fpath = sys.argv[2]
         else:
             # ./finter pe32.bin file.bin 0x10
             dissector = sys.argv[1]
