@@ -279,7 +279,7 @@ def dataUntil(fp, terminator, peek=0):
 # taggers
 ###############################################################################
 
-def tag(fp, length, name, comment='', peek=False):
+def tag(fp, length, name, comment='', peek=False, rewind=False):
     pos = fp.tell()
     val = fp.read(length)
     if type(comment) == types.FunctionType: comment = comment(val)
@@ -289,7 +289,7 @@ def tag(fp, length, name, comment='', peek=False):
     else:
         print('[0x%X,0x%X) raw %s' % (pos, pos+length, comment))
 
-    if peek: fp.seek(pos)
+    if peek or rewind: fp.seek(pos)
     return val
 
 # tag from an earlier file position to the current file position
