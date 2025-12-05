@@ -194,6 +194,8 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
             analyze = atags.analyze
         elif sample.startswith(b'\xd0\x0d\xfe\xed'):
             analyze = fdt.analyze
+        elif sample.startswith(b'<SALEAE>'):
+            analyze = saleae_bin.analyze
 
     # TECHNIQUE 3: guess based on file extension
     #

@@ -128,6 +128,7 @@ fmtu32 = '<I'
 fmt32 = '<i'
 fmtu64 = '<Q'
 fmt64 = '<q'
+fmtd = '<d'
 
 def setLittleEndian():
     global endian
@@ -143,6 +144,7 @@ def setLittleEndian():
     fmt32 = '<i'
     fmtu64 = '<Q'
     fmt64 = '<q'
+    fmtd = '<d'
 
     endian = 'little'
     return old
@@ -161,6 +163,7 @@ def setBigEndian():
     fmt32 = '>i'
     fmtu64 = '>Q'
     fmt64 = '>q'
+    fmtd = '>d'
 
     endian = 'big'
     return old
@@ -222,6 +225,12 @@ def int64(fp, peek=0):
 def uint64(fp, peek=0):
     global fmtu64
     value = unpack(fmtu64, fp.read(8))[0]
+    if peek: fp.seek(-8,1)
+    return value
+
+def double(fp, peek=0):
+    global fmtd
+    value = unpack(fmtd, fp.read(8))[0]
     if peek: fp.seek(-8,1)
     return value
 
@@ -371,6 +380,16 @@ def tagInt64(fp, name, comment='', peek=0):
         print('[0x%X,0x%X) %s %s=%d %s' % (pos, pos+8, fmt64, name, val, comment))
     else:
         print('[0x%X,0x%X) %s %d %s' % (pos, pos+8, fmt64, val, comment))
+    return val
+
+def tagDouble(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = double(fp, peek)
+    if type(comment) == types.FunctionType: comment = comment(val)
+    if name:
+        print('[0x%X,0x%X) %s %s=%f %s' % (pos, pos+8, fmtd, name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s %f %s' % (pos, pos+8, fmtd, val, comment))
     return val
 
 def tagUleb128(fp, name, comment='', peek=0):

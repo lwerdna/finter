@@ -4,10 +4,7 @@
 
 import os
 import sys
-import struct
-import binascii
 
-from . import pe
 from .helpers import *
 
 ###############################################################################
