@@ -196,6 +196,8 @@ def find_dissector(fpath, offset=0, failure_actions=[]):
             analyze = fdt.analyze
         elif sample.startswith(b'<SALEAE>'):
             analyze = saleae_bin.analyze
+        elif sample.startswith(b'SFDP'):
+            analyze = sfdp.analyze
 
     # TECHNIQUE 3: guess based on file extension
     #

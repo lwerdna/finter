@@ -204,6 +204,16 @@ def uint16(fp, peek=0):
     if peek: fp.seek(-2,1)
     return value
 
+def uint24(fp, peek=0):
+    global endian
+    data = fp.read(3)
+    if endian == 'little':
+        value = (data[0] << 16) | (data[1] << 8) | data[2]
+    else:
+        value = (data[2] << 16) | (data[1] << 8) | data[0]
+    if peek: fp.seek(-3,1)
+    return value
+
 def int32(fp, peek=0):
     global fmt32
     value = unpack(fmt32, fp.read(4))[0]
@@ -340,6 +350,15 @@ def tagInt16(fp, name, comment='', peek=0):
         print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+2, fmt16, name, val, comment))
     else:
         print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+2, fmt16, val, comment))
+
+def tagUint24(fp, name, comment='', peek=0):
+    pos = fp.tell()
+    val = uint24(fp, peek)
+    if type(comment) == types.FunctionType: comment = comment(val)
+    if name:
+        print('[0x%X,0x%X) %s %s=0x%X %s' % (pos, pos+3, 'raw', name, val, comment))
+    else:
+        print('[0x%X,0x%X) %s 0x%X %s' % (pos, pos+3, 'raw', val, comment))
     return val
 
 def tagUint32(fp, name, comment='', peek=0):
