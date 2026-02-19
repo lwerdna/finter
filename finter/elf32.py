@@ -149,10 +149,10 @@ def analyze(fp):
 
     # read elf32_hdr
     tag(fp, SIZEOF_ELF32_HDR, "elf32_hdr", '', peek=True)
-    tag(fp, 4, "e_ident[0..4)")
-    tagUint8(fp, "e_ident[EI_CLASS]", "(32-bit)")
-    ei_data = uint8(fp, 1)
-    tagUint8(fp, "e_ident[EI_DATA]", ei_data_tostr(ei_data))
+    tag(fp, 16, "e_ident", peek=True)
+    tag(fp, 4, "e_ident[EI_MAGIC]")
+    tagUint8(fp, "e_ident[EI_CLASS]", ei_class_tostr)
+    ei_data = tagUint8(fp, "e_ident[EI_DATA]", ei_data_tostr)
     assert(ei_data in [ELFDATA2LSB,ELFDATA2MSB])
     if ei_data == ELFDATA2LSB:
         setLittleEndian()
@@ -164,13 +164,13 @@ def analyze(fp):
     tag(fp, 7, "e_ident[EI_PAD]")
     e_type = uint16(fp, 1)
     tagUint16(fp, "e_type %s" % e_type_tostr(e_type))
-    e_machine = uint16(fp, 1)
-    tagUint16(fp, "e_machine %s" % (e_machine_tostr(e_machine)))
+    e_machine = tagUint16(fp, "e_machine", e_machine_tostr)
     tagUint32(fp, "e_version")
     tagUint32(fp, "e_entry")
     e_phoff = tagUint32(fp, "e_phoff")
     e_shoff = tagUint32(fp, "e_shoff")
-    tagUint32(fp, "e_flags")
+
+    tagUint32(fp, "e_flags", lambda flags: e_flags_to_str(e_machine, flags))
     e_ehsize = tagUint16(fp, "e_ehsize")
     assert(e_ehsize == SIZEOF_ELF32_HDR)
     tagUint16(fp, "e_phentsize")

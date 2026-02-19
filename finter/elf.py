@@ -28,6 +28,10 @@ ELFCLASS32 = 1
 ELFCLASS64 = 2
 ELFCLASSNUM = 3
 
+def ei_class_tostr(c):
+    lookup = { ELFCLASSNONE:'NONE', ELFCLASS32:'32-bit', ELFCLASS64:'64-bit' }
+    return lookup.get(c, 'UNKNOWN')
+
 ELFDATANONE = 0
 ELFDATA2LSB = 1
 ELFDATA2MSB = 2
@@ -246,6 +250,25 @@ def e_machine_tostr(em):
 	except ValueError:
 		name = '(UNKNOWN %d)' % (em, em)
 	return name
+
+EF_ARM_ABIMASK = 0xFF000000
+EF_ARM_BE8 = 0x00800000
+EF_ARM_GCCMASK = 0x00400FFF
+EF_ARM_ABI_FLOAT_HARD = 0x00000400
+EF_ARM_ABI_FLOAT_SOFT = 0x00000200
+
+def e_flags_to_str(machine, flags):
+    if machine == E_MACHINE.EM_ARM.value:
+        result = []
+        result.append(f'ABI={((flags & EF_ARM_ABIMASK) >> 24):d}')
+        if flags & EF_ARM_BE8:
+            result.append(f'BE8')
+        if flags & EF_ARM_ABI_FLOAT_HARD:
+            result.append(f'HARDFLOAT')
+        if flags & EF_ARM_ABI_FLOAT_SOFT:
+            result.append(f'SOFTFLOAT')
+        return '(' + '|'.join(result) + ')'
+    return ''
 
 # section header type
 SHT_NULL = 0
