@@ -731,6 +731,20 @@ def tag_strtab(fp, size):
     fp.seek(base)
     #tag(fp, size, 'strtab')
 
+def tag___versions(fp, size):
+    struct_size = 4 + 60
+    total = size // struct_size
+    base = fp.tell()
+
+    i=0
+    while size > 0:
+        tag(fp, struct_size, 'struct modversion_info', f'idx={i}/{total-1}', rewind=True)
+        tagUint32(fp, 'crc')
+        tag(fp, struct_size-4, 'name')
+        size -= struct_size
+
+    fp.seek(base)
+
 ###############################################################################
 # helper classes
 ###############################################################################

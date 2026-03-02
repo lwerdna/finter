@@ -102,20 +102,23 @@ def tag_elf32_shdr(fp, index, scnStrTab):
     sh_addralign = tagUint32(fp, "sh_addralign")
     sh_entsize = tagUint32(fp, "sh_entsize")
 
+    name = scnStrTab[sh_name]
+
     fp.seek(base)
     tag(fp, 40, 'elf32_shdr "%s" %s (index: %d)' % \
-        (scnStrTab[sh_name], sh_type_tostr(sh_type), index))
+        (name, sh_type_tostr(sh_type), index))
 
-    return {'sh_name':sh_name,
-            'sh_type':sh_type,
-            'sh_flags':sh_flags,
-            'sh_addr':sh_addr,
-            'sh_offset':sh_offset,
-            'sh_size':sh_size,
-            'sh_link':sh_link,
-            'sh_info':sh_info,
-            'sh_addralign':sh_addralign,
-            'sh_entsize':sh_entsize}
+    return {'sh_name': sh_name,
+            'sh_type': sh_type,
+            'sh_flags': sh_flags,
+            'sh_addr': sh_addr,
+            'sh_offset': sh_offset,
+            'sh_size': sh_size,
+            'sh_link': sh_link,
+            'sh_info': sh_info,
+            'sh_addralign': sh_addralign,
+            'sh_entsize': sh_entsize,
+            'name': name}
 
 def tag_elf32_phdr(fp, index):
     base = fp.tell()
@@ -197,7 +200,7 @@ def analyze(fp):
         info:dict = tag_elf32_shdr(fp, i, scnStrTab)
         scn_infos.append(info)
 
-    # tag section contents
+    # tag section contents that we're aware of
     for i, info in enumerate(scn_infos):
         # top level container
         if not info['sh_type'] in [SHT_NULL, SHT_NOBITS] and info['sh_size'] > 0:
@@ -238,6 +241,10 @@ def analyze(fp):
             fp.seek(info['sh_offset'])
             while fp.tell() < (info['sh_offset'] + info['sh_size']):
                 tag_elf32_rela(fp, e_machine)
+
+        elif info['name'] == '__versions':
+            fp.seek(info['sh_offset'])
+            tag___versions(fp, info['sh_size'])
 
     # read program headers
     # REMINDER! struct member 'p_flags' changes between 32/64 bits
