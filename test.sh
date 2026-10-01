@@ -26,13 +26,21 @@ FPATH=$HOME/repos/lwerdna/filesamples
 ./oha.py avcc $FPATH/lena-avcc-data.bin
 ./oha.py avcc_extradata $FPATH/lena-avcc-extradata.bin
 ./oha.py $FPATH/ls-x86_64
-./oha.py $FPATH/hello-aarch64-linux-gnu
-./oha.py $FPATH/hello-arm-linux-gnueabi
-./oha.py $FPATH/hello-arm-linux-gnueabihf
-./oha.py $FPATH/hello-mips-linux-gnu
 ./oha.py $FPATH/vbmeta.img
 ./oha.py $FPATH/pkcs7_cms.der
 ./oha.py $FPATH/rsa_private_key.der
+
+./oha.py $FPATH/hello-aarch64-linux-gnu
+./oha.py $FPATH/hello-arm-linux-gnueabi
+./oha.py $FPATH/hello-arm-linux-gnueabihf
+./oha.py $FPATH/hello-arm-none-eabi
+./oha.py $FPATH/hello-mips-linux-gnu
+
+./oha.py $FPATH/hello-aarch64-linux-gnu.o
+./oha.py $FPATH/hello-arm-linux-gnueabi.o
+./oha.py $FPATH/hello-arm-linux-gnueabihf.o
+./oha.py $FPATH/hello-arm-none-eabi.o
+./oha.py $FPATH/hello-mips-linux-gnu.o
 
 #FPATH=$HOME/fdumps/filesamples
 #

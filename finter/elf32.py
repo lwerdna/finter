@@ -153,8 +153,11 @@ def analyze(fp):
     # read elf32_hdr
     tag(fp, SIZEOF_ELF32_HDR, "elf32_hdr", '', peek=True)
     tag(fp, 16, "e_ident", peek=True)
+    # 00: e_ident[EI_MAGIC] is 4 bytes
     tag(fp, 4, "e_ident[EI_MAGIC]")
+    # 04: e_ident[EI_CLASS] is 1 byte
     tagUint8(fp, "e_ident[EI_CLASS]", ei_class_tostr)
+    # 05: e_ident[EI_DATA] is 1 byte
     ei_data = tagUint8(fp, "e_ident[EI_DATA]", ei_data_tostr)
     assert(ei_data in [ELFDATA2LSB,ELFDATA2MSB])
     if ei_data == ELFDATA2LSB:
@@ -240,7 +243,7 @@ def analyze(fp):
         elif info['sh_type'] == SHT_RELA:
             fp.seek(info['sh_offset'])
             while fp.tell() < (info['sh_offset'] + info['sh_size']):
-                tag_elf32_rela(fp, e_machine)
+                tag_elf32_rela(fp)
 
         elif info['name'] == '__versions':
             fp.seek(info['sh_offset'])
