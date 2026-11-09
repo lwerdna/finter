@@ -81,4 +81,7 @@ if __name__ == '__main__':
       ))])
 
     fig.update_layout(title_text=str(os.path.basename(fpath)), font_size=10)
-    fig.write_html('/tmp/tmp.html')
+
+    fpath_out = '/tmp/sankey.html'
+    print(f'writing: {fpath_out}')
+    fig.write_html(fpath_out)
